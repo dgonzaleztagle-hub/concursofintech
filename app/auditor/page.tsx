@@ -25,6 +25,8 @@ export default function AuditorPage() {
     showWalletAlert,
     selectedDemoId,
     setSelectedDemoId,
+    customProblem,
+    setCustomProblem,
     setMode,
     setManualProduct,
     setManualInsurance,
@@ -219,40 +221,21 @@ export default function AuditorPage() {
             </div>
 
             <div className="text-[10px] font-bold opacity-60 text-center leading-relaxed">
-              El cerebro analizará el caso real.<br />Elige el que más se parezca a tu situación:
+              Describe tu situación con tus propias palabras.<br />El cerebro analizará el caso real.
             </div>
 
-            {/* Scenario cards */}
-            <div className="flex flex-col gap-2 flex-1">
-              {DEMO_SCENARIOS.map((scenario) => {
-                const isSelected = selectedDemoId === scenario.id;
-                return (
-                  <button
-                    key={scenario.id}
-                    onClick={() => setSelectedDemoId(scenario.id)}
-                    className={`w-full text-left p-3 rounded-xl border-2 transition-all active:scale-98 ${
-                      isSelected
-                        ? "bg-[#1a2f1a] border-[#4a8a4a] text-[#d4e8b0]"
-                        : "bg-black bg-opacity-5 border-black border-opacity-10 hover:border-opacity-30"
-                    }`}
-                  >
-                    <div className="flex items-start gap-2">
-                      <span className="text-base mt-0.5 flex-shrink-0">{scenario.icon}</span>
-                      <div className="flex-1 min-w-0">
-                        <div className={`text-[11px] font-black uppercase leading-tight ${isSelected ? "text-[#d4e8b0]" : ""}`}>
-                          {scenario.label}
-                        </div>
-                        <div className={`text-[9px] mt-0.5 leading-snug ${isSelected ? "opacity-70 text-[#d4e8b0]" : "opacity-50"}`}>
-                          {scenario.detail}
-                        </div>
-                      </div>
-                      {isSelected && (
-                        <span className="text-[#4a8a4a] text-base flex-shrink-0">✓</span>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
+            {/* Textarea libre */}
+            <div className="flex-1 flex flex-col">
+              <textarea
+                value={customProblem}
+                onChange={(e) => setCustomProblem(e.target.value)}
+                placeholder="Ej: Me aparece un cobro mensual de $4.990 por un seguro que no recuerdo haber contratado en mi tarjeta de crédito..."
+                className="w-full flex-1 resize-none rounded-xl border-2 border-black border-opacity-15 bg-black bg-opacity-5 p-3 text-[11px] font-bold leading-relaxed placeholder:opacity-30 placeholder:font-normal focus:outline-none focus:border-opacity-40 focus:bg-white focus:bg-opacity-30 transition-all"
+                style={{ minHeight: "160px" }}
+              />
+              <div className="text-[9px] opacity-30 text-right mt-1 font-bold">
+                {customProblem.length} caracteres
+              </div>
             </div>
 
             {/* Actions */}
@@ -265,7 +248,8 @@ export default function AuditorPage() {
               </button>
               <button
                 onClick={handleDemoConfirm}
-                className="flex-[2] modern-button !py-2"
+                disabled={customProblem.trim().length < 10}
+                className={`flex-[2] modern-button !py-2 ${customProblem.trim().length < 10 ? "opacity-30 cursor-not-allowed" : ""}`}
               >
                 🧠 [ ANALIZAR ]
               </button>

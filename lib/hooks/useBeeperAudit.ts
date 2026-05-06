@@ -211,6 +211,7 @@ export function useBeeperAudit() {
   const [showWalletAlert, setShowWalletAlert] = useState(false);
   const [userProfile, setUserProfile] = useState<BeeperUserProfile | null>(null);
   const [selectedDemoId, setSelectedDemoId] = useState<string>(DEMO_SCENARIOS[0].id);
+  const [customProblem, setCustomProblem] = useState<string>("");
   const [consents, setConsents] = useState({
     audit: true,
     portability: true,
@@ -301,9 +302,7 @@ export function useBeeperAudit() {
   }, [manualProduct, manualInsurance]);
 
   const handleDemoConfirm = useCallback(async () => {
-    const scenario = DEMO_SCENARIOS.find(s => s.id === selectedDemoId) || DEMO_SCENARIOS[0];
-    const baseProfile = buildBaseProfile(userProfile);
-    const profile = scenario.buildProfile(baseProfile);
+    const profile = buildBaseProfile(userProfile);
 
     setState("scanning");
     setErrorMsg("");
@@ -318,7 +317,7 @@ export function useBeeperAudit() {
         signal: controller.signal,
         body: JSON.stringify({
           ...profile,
-          problemaReportado: scenario.problemaReportado,
+          problemaReportado: customProblem.trim(),
           demoMode: true,
         }),
       });
@@ -344,7 +343,7 @@ export function useBeeperAudit() {
         setState("error");
       }
     }
-  }, [selectedDemoId, userProfile, runLocalMock]);
+  }, [customProblem, userProfile, runLocalMock]);
 
   const handleScan = useCallback(async () => {
     if (mode === "auto" && !isValidRut(rut)) {
@@ -479,6 +478,8 @@ export function useBeeperAudit() {
     userProfile,
     selectedDemoId,
     setSelectedDemoId,
+    customProblem,
+    setCustomProblem,
     setMode,
     setManualProduct,
     setManualInsurance,
