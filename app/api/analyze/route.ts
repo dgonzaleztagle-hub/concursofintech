@@ -14,6 +14,21 @@ import { fetchRealEconomicData } from "@/lib/utils/uf";
 import { anonymizeProfile } from "@/lib/utils/security";
 import { checkFinancialFraud } from "@/lib/utils/fraud";
 
+// Normaliza la respuesta del LLM antes de Zod: status en lowercase, números como números
+function normalizeLLMResponse(raw: Record<string, unknown>): Record<string, unknown> {
+  const normalized = { ...raw };
+  if (typeof normalized.status === "string") {
+    normalized.status = normalized.status.toLowerCase().trim();
+  }
+  for (const key of ["ahorro_trimestral_clp", "ahorro_anual_clp"] as const) {
+    if (typeof normalized[key] === "string") {
+      const parsed = Number(String(normalized[key]).replace(/[^0-9.-]/g, ""));
+      if (!isNaN(parsed)) normalized[key] = parsed;
+    }
+  }
+  return normalized;
+}
+
 async function callGroq(systemPrompt: string, userPrompt: string): Promise<string> {
   const groqKey = process.env.GROQ_API_KEY;
   if (!groqKey) throw new Error("GROQ_API_KEY not set");
@@ -117,28 +132,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       throw new Error("No hay proveedores de IA disponibles");
     }
 
-    // --- PASO 2: AUDITORÍA (Double-Pass Verification) ---
-    console.info("[Beeper API] PASO 2: Ejecutando Auditoría Regulatoria...");
-    const auditPrompt = `
-      ERES UN AUDITOR LEGAL FINANCIERO SENIOR.
-      Tu tarea es verificar la calidad y veracidad del siguiente diagnóstico financiero:
-      
-      DIAGNÓSTICO A REVISAR:
-      ${JSON.stringify(initialAnalysis, null, 2)}
-      
-      REGLAS DE AUDITORÍA:
-      1. ¿El diagnóstico cita correctamente la normativa chilena (Ley 19.496, CMF, etc.)?
-      2. ¿Los cálculos de ahorro anual son matemáticamente consistentes (Ahorro 3M * 4)?
-      3. ¿El lenguaje es profesional y evita alucinaciones?
-      
-      Si el diagnóstico es correcto, devuélvelo tal cual. 
-      Si tiene errores, CORRÍGELOS manteniendo el mismo esquema JSON.
-      Responde ÚNICAMENTE con el JSON final.
-    `.trim();
-
-    let auditedJson: AnalysisResult;
+    // --- PASO 2: AUDITORÍA (Double-Pass — solo para Anthropic/Gemini, Groq ya es preciso) ---
+    let auditedJson: Record<string, unknown> = initialAnalysis as unknown as Record<string, unknown>;
 
     if (anthropic) {
+      console.info("[Beeper API] PASO 2: Ejecutando Auditoría Regulatoria (Claude)...");
+      const auditPrompt = `
+        ERES UN AUDITOR LEGAL FINANCIERO SENIOR.
+        Verifica y corrige si es necesario el siguiente diagnóstico financiero.
+        REGLAS: normativa chilena correcta, cálculos consistentes (ahorro_anual = ahorro_trimestral * 4), JSON limpio.
+        Si es correcto, devuélvelo tal cual. Si hay errores, corrígelos.
+        Responde ÚNICAMENTE con el JSON final.
+        DIAGNÓSTICO: ${JSON.stringify(initialAnalysis, null, 2)}
+      `.trim();
       const auditMsg = await anthropic.messages.create({
         model: "claude-3-5-sonnet-20240620",
         max_tokens: 2000,
@@ -147,22 +153,25 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       });
       const auditText = (auditMsg.content[0] as { text: string }).text;
       auditedJson = JSON.parse(auditText.substring(auditText.indexOf("{"), auditText.lastIndexOf("}") + 1));
-    } else if (groqKey) {
-      const auditText = await callGroq(
-        "Eres un Auditor Legal Financiero chileno. Responde solo con JSON válido.",
-        auditPrompt
-      );
-      auditedJson = JSON.parse(auditText);
     } else if (modelAuditorGemini) {
+      console.info("[Beeper API] PASO 2: Ejecutando Auditoría Regulatoria (Gemini)...");
+      const auditPrompt = `Audita este diagnóstico financiero. Devuelve solo JSON corregido: ${JSON.stringify(initialAnalysis)}`;
       const auditResult = await modelAuditorGemini.generateContent(auditPrompt);
       auditedJson = JSON.parse(auditResult.response.text());
     } else {
-      throw new Error("No AI provider available for audit step");
+      console.info("[Beeper API] PASO 2: Groq → omitiendo double-pass (single-pass es suficiente).");
     }
 
-    // --- PASO 3: VALIDACIÓN ESTRUCTURAL (Zod) ---
+    // --- PASO 3: VALIDACIÓN ESTRUCTURAL (Zod con normalización) ---
     console.info("[Beeper API] PASO 3: Validación final de esquema...");
-    const finalData = AnalysisResultSchema.parse(auditedJson);
+    const normalized = normalizeLLMResponse(auditedJson);
+    const zodResult = AnalysisResultSchema.safeParse(normalized);
+    if (!zodResult.success) {
+      console.error("[Beeper API] Zod validation failed:", JSON.stringify(zodResult.error.flatten()));
+      console.error("[Beeper API] Raw LLM output:", JSON.stringify(normalized));
+      throw new Error(`Schema inválido: ${zodResult.error.issues.map(i => i.message).join(", ")}`);
+    }
+    const finalData = zodResult.data;
 
     // Respuesta final optimizada
     const response: AnalysisResult & { uf_valor_usado: number; timestamp: string; version: string; provider: string } = {
