@@ -120,6 +120,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     } else if (modelAuditorGemini) {
       const auditResult = await modelAuditorGemini.generateContent(auditPrompt);
       auditedJson = JSON.parse(auditResult.response.text());
+    } else {
+      throw new Error("No AI provider available for audit step");
     }
 
     // --- PASO 3: VALIDACIÓN ESTRUCTURAL (Zod) ---
