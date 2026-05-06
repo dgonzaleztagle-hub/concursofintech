@@ -10,7 +10,151 @@ import { saveSecurely, loadSecurely } from "../utils/security";
 import { BEEPER_PROFILE_KEY } from "@/components/OnboardingView";
 import type { BeeperUserProfile } from "@/components/OnboardingView";
 
-export type AppState = "idle" | "connecting" | "scanning" | "result" | "error" | "sovereignty" | "preventive";
+export type AppState = "idle" | "connecting" | "scanning" | "result" | "error" | "sovereignty" | "preventive" | "demo_select";
+
+export const DEMO_SCENARIOS: Array<{
+  id: string;
+  icon: string;
+  label: string;
+  detail: string;
+  buildProfile: (base: UserProfile) => UserProfile;
+  problemaReportado: string;
+}> = [
+  {
+    id: "seguro_no_reconocido",
+    icon: "🔍",
+    label: "Tengo un seguro que no reconozco",
+    detail: "Aparece un cobro mensual por seguro que no recuerdo haber contratado",
+    problemaReportado: "El cliente reporta un cobro mensual por seguro que no recuerda haber autorizado. Revisar si existe consentimiento informado.",
+    buildProfile: (base) => ({
+      ...base,
+      fuente_datos: "manual" as const,
+      productos_financieros: [{
+        id_producto: "TC-DEMO-001",
+        tipo: "tarjeta_credito" as const,
+        institucion: "Banco Falabella",
+        monto: 1_200_000,
+        seguros_asociados: [{
+          id_seguro: "SEG-MISTERIO",
+          tipo_cobertura: "cesantia" as const,
+          es_obligatorio: false,
+          costo_mensual_uf: 0.18,
+          institucion_aseguradora: "Cardif Chile",
+        }]
+      }]
+    }),
+  },
+  {
+    id: "cobro_duplicado",
+    icon: "⚠️",
+    label: "Hay un cobro duplicado en mi estado de cuenta",
+    detail: "El mismo seguro aparece cobrado dos veces en distintas fechas del mes",
+    problemaReportado: "El cliente detectó dos cobros por el mismo concepto de seguro en el mismo mes. Posible duplicidad o doble contratación sin consentimiento.",
+    buildProfile: (base) => ({
+      ...base,
+      fuente_datos: "manual" as const,
+      productos_financieros: [{
+        id_producto: "TC-DEMO-002",
+        tipo: "tarjeta_credito" as const,
+        institucion: "Banco BCI",
+        monto: 800_000,
+        seguros_asociados: [
+          {
+            id_seguro: "SEG-CESANTIA-A",
+            tipo_cobertura: "cesantia" as const,
+            es_obligatorio: false,
+            costo_mensual_uf: 0.14,
+            institucion_aseguradora: "Seguros BCI",
+          },
+          {
+            id_seguro: "SEG-CESANTIA-B",
+            tipo_cobertura: "cesantia" as const,
+            es_obligatorio: false,
+            costo_mensual_uf: 0.14,
+            institucion_aseguradora: "Seguros BCI",
+          }
+        ]
+      }]
+    }),
+  },
+  {
+    id: "hipotecario_seguros",
+    icon: "🏠",
+    label: "Me incluyeron seguros en mi crédito hipotecario",
+    detail: "Al firmar el hipotecario me incluyeron seguros que no pedí explícitamente",
+    problemaReportado: "Cliente firmó crédito hipotecario con seguros adicionales (vida, desgravamen, incendio) contratados en el banco sin cotizar alternativas. Posible venta atada.",
+    buildProfile: (base) => ({
+      ...base,
+      fuente_datos: "manual" as const,
+      productos_financieros: [{
+        id_producto: "HIP-DEMO-001",
+        tipo: "credito_hipotecario" as const,
+        institucion: "Banco Santander",
+        monto: 92_000_000,
+        tasa_anual: 4.8,
+        plazo_meses: 240,
+        seguros_asociados: [
+          {
+            id_seguro: "SEG-DESGRAVAMEN",
+            tipo_cobertura: "desgravamen" as const,
+            es_obligatorio: true,
+            costo_mensual_uf: 0.22,
+            institucion_aseguradora: "Seguros Santander",
+          },
+          {
+            id_seguro: "SEG-INCENDIO",
+            tipo_cobertura: "incendio" as const,
+            es_obligatorio: true,
+            costo_mensual_uf: 0.18,
+            institucion_aseguradora: "Seguros Santander",
+          },
+          {
+            id_seguro: "SEG-VIDA-ATADO",
+            tipo_cobertura: "vida" as const,
+            es_obligatorio: false,
+            costo_mensual_uf: 0.35,
+            institucion_aseguradora: "Seguros Santander",
+          }
+        ]
+      }]
+    }),
+  },
+  {
+    id: "no_se_obligatorio",
+    icon: "📋",
+    label: "No sé cuáles de mis seguros son obligatorios",
+    detail: "Tengo varios seguros y no sé cuáles puedo cancelar sin problemas",
+    problemaReportado: "Cliente no tiene claridad sobre qué seguros son legalmente obligatorios y cuáles son opcionales. Solicita orientación para optimizar sus gastos financieros.",
+    buildProfile: (base) => ({
+      ...base,
+      fuente_datos: "manual" as const,
+      productos_financieros: [{
+        id_producto: "CC-DEMO-001",
+        tipo: "credito_consumo" as const,
+        institucion: "Banco Estado",
+        monto: 6_500_000,
+        tasa_anual: 21.5,
+        plazo_meses: 36,
+        seguros_asociados: [
+          {
+            id_seguro: "SEG-VIDA-CC",
+            tipo_cobertura: "vida" as const,
+            es_obligatorio: false,
+            costo_mensual_uf: 0.12,
+            institucion_aseguradora: "Seguros Estado",
+          },
+          {
+            id_seguro: "SEG-CESANTIA-CC",
+            tipo_cobertura: "cesantia" as const,
+            es_obligatorio: false,
+            costo_mensual_uf: 0.10,
+            institucion_aseguradora: "Seguros Estado",
+          }
+        ]
+      }]
+    }),
+  },
+];
 
 function buildBaseProfile(userProfile: BeeperUserProfile | null): UserProfile {
   return {
@@ -66,6 +210,7 @@ export function useBeeperAudit() {
   const [manualInsurance, setManualInsurance] = useState<string>("Cesantía");
   const [showWalletAlert, setShowWalletAlert] = useState(false);
   const [userProfile, setUserProfile] = useState<BeeperUserProfile | null>(null);
+  const [selectedDemoId, setSelectedDemoId] = useState<string>(DEMO_SCENARIOS[0].id);
   const [consents, setConsents] = useState({
     audit: true,
     portability: true,
@@ -155,9 +300,61 @@ export function useBeeperAudit() {
     }, 1500);
   }, [manualProduct, manualInsurance]);
 
+  const handleDemoConfirm = useCallback(async () => {
+    const scenario = DEMO_SCENARIOS.find(s => s.id === selectedDemoId) || DEMO_SCENARIOS[0];
+    const baseProfile = buildBaseProfile(userProfile);
+    const profile = scenario.buildProfile(baseProfile);
+
+    setState("scanning");
+    setErrorMsg("");
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+    try {
+      const response = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          ...profile,
+          problemaReportado: scenario.problemaReportado,
+          demoMode: true,
+        }),
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP ${response.status}: Error de Servidor`);
+      }
+
+      const data = await response.json();
+      setResult(data);
+      saveSecurely("beeper_last_result", data);
+      setState("result");
+    } catch (err) {
+      clearTimeout(timeoutId);
+      const isNetworkError = err instanceof TypeError || (err instanceof Error && err.name === "AbortError");
+      if (isNetworkError) {
+        runLocalMock();
+      } else {
+        setErrorMsg(err instanceof Error ? err.message : "ERR: SEÑAL PERDIDA");
+        setState("error");
+      }
+    }
+  }, [selectedDemoId, userProfile, runLocalMock]);
+
   const handleScan = useCallback(async () => {
     if (mode === "auto" && !isValidRut(rut)) {
       alert("Por favor, ingresa un RUT válido");
+      return;
+    }
+
+    // En modo auto, mostrar selector demo antes de escanear
+    if (mode === "auto") {
+      setState("demo_select");
       return;
     }
 
@@ -280,12 +477,15 @@ export function useBeeperAudit() {
     manualInsurance,
     showWalletAlert,
     userProfile,
+    selectedDemoId,
+    setSelectedDemoId,
     setMode,
     setManualProduct,
     setManualInsurance,
     setShowWalletAlert,
     handleRutChange,
     handleScan,
+    handleDemoConfirm,
     startConnecting,
     completeConnection,
     reset,

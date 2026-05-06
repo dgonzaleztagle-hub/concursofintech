@@ -91,6 +91,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     valorUF = econData.uf;
     const preventiveMode = body.preventiveMode === true;
     const productType = body.productType || "Crédito Consumo";
+    const problemaReportado: string | undefined = body.problemaReportado;
 
     // --- CAPA DE SEGURIDAD 3: Detección de Fraude (PhishTank/CSIRT) ---
     const inst = profile.productos_financieros?.[0]?.institucion || "";
@@ -100,9 +101,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const inclusionRules = getStandardizedInclusionPrompt();
 
     // Inyectar alerta de fraude si aplica
-    const contextWithFraud = fraudStatus.is_dangerous
+    let contextWithFraud = fraudStatus.is_dangerous
       ? `${systemPrompt}\n\n⚠️ ALERTA DE SEGURIDAD: La institución '${inst}' está marcada como sospechosa en ${fraudStatus.source}.`
       : systemPrompt;
+
+    // Inyectar problema específico reportado por el usuario (modo demo y flujos reales)
+    if (problemaReportado) {
+      contextWithFraud += `\n\n## PROBLEMA ESPECÍFICO REPORTADO POR EL CIUDADANO\n${problemaReportado}\nConcentra tu análisis en este problema puntual. Sé directo y accionable.`;
+    }
 
     // --- PASO 1: GENERACIÓN (First Pass) ---
     console.info(`[Beeper API] PASO 1: Generando diagnóstico inicial usando ${anthropic ? "Claude" : "Gemini"}...`);

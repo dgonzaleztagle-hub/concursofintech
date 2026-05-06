@@ -11,7 +11,7 @@ import { AlertCard } from "@/components/AlertCard";
 import { LoadingBeeper } from "@/components/LoadingBeeper";
 import { SovereigntyView } from "@/components/SovereigntyView";
 import { BankConnectionView } from "@/components/BankConnectionView";
-import { useBeeperAudit } from "@/lib/hooks/useBeeperAudit";
+import { useBeeperAudit, DEMO_SCENARIOS } from "@/lib/hooks/useBeeperAudit";
 
 export default function AuditorPage() {
   const {
@@ -23,12 +23,15 @@ export default function AuditorPage() {
     manualProduct,
     manualInsurance,
     showWalletAlert,
+    selectedDemoId,
+    setSelectedDemoId,
     setMode,
     setManualProduct,
     setManualInsurance,
     setShowWalletAlert,
     handleRutChange,
     handleScan,
+    handleDemoConfirm,
     startConnecting,
     completeConnection,
     reset,
@@ -202,6 +205,71 @@ export default function AuditorPage() {
             >
               🚀 {mode === "preventive" ? "[ RECIBIR ORIENTACIÓN ]" : "[ INICIAR AUDITORÍA ]"}
             </button>
+          </div>
+        )}
+
+        {state === "demo_select" && (
+          <div className="flex flex-col h-full gap-3 animate-in slide-in-from-right-5">
+            {/* Header */}
+            <div className="text-center">
+              <div className="text-[9px] font-black uppercase tracking-widest opacity-50 mb-1">MODO DEMO</div>
+              <div className="text-[13px] font-black uppercase leading-tight">
+                ¿Qué problema<br />quieres auditar?
+              </div>
+            </div>
+
+            <div className="text-[10px] font-bold opacity-60 text-center leading-relaxed">
+              El cerebro analizará el caso real.<br />Elige el que más se parezca a tu situación:
+            </div>
+
+            {/* Scenario cards */}
+            <div className="flex flex-col gap-2 flex-1">
+              {DEMO_SCENARIOS.map((scenario) => {
+                const isSelected = selectedDemoId === scenario.id;
+                return (
+                  <button
+                    key={scenario.id}
+                    onClick={() => setSelectedDemoId(scenario.id)}
+                    className={`w-full text-left p-3 rounded-xl border-2 transition-all active:scale-98 ${
+                      isSelected
+                        ? "bg-[#1a2f1a] border-[#4a8a4a] text-[#d4e8b0]"
+                        : "bg-black bg-opacity-5 border-black border-opacity-10 hover:border-opacity-30"
+                    }`}
+                  >
+                    <div className="flex items-start gap-2">
+                      <span className="text-base mt-0.5 flex-shrink-0">{scenario.icon}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className={`text-[11px] font-black uppercase leading-tight ${isSelected ? "text-[#d4e8b0]" : ""}`}>
+                          {scenario.label}
+                        </div>
+                        <div className={`text-[9px] mt-0.5 leading-snug ${isSelected ? "opacity-70 text-[#d4e8b0]" : "opacity-50"}`}>
+                          {scenario.detail}
+                        </div>
+                      </div>
+                      {isSelected && (
+                        <span className="text-[#4a8a4a] text-base flex-shrink-0">✓</span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2 mt-auto">
+              <button
+                onClick={reset}
+                className="flex-1 py-2 text-[10px] font-black uppercase opacity-50 hover:opacity-80 transition-opacity border border-current rounded-xl"
+              >
+                ← Volver
+              </button>
+              <button
+                onClick={handleDemoConfirm}
+                className="flex-[2] modern-button !py-2"
+              >
+                🧠 [ ANALIZAR ]
+              </button>
+            </div>
           </div>
         )}
 
