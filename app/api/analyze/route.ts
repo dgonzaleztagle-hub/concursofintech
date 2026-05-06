@@ -107,7 +107,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     // Inyectar problema específico reportado por el usuario (modo demo y flujos reales)
     if (problemaReportado) {
-      contextWithFraud += `\n\n## PROBLEMA ESPECÍFICO REPORTADO POR EL CIUDADANO\n${problemaReportado}\nConcentra tu análisis en este problema puntual. Sé directo y accionable.`;
+      contextWithFraud += `\n\n## ⚠️ PROBLEMA REPORTADO POR EL CIUDADANO (PRIORIDAD MÁXIMA)
+ESTE ES UN CASO REAL QUE REQUIERE ANÁLISIS INMEDIATO:
+"${problemaReportado}"
+
+TU TAREA AHORA ES:
+1. **ASUMIR este problema como CONFIRMADO** (el ciudadano lo reportó porque existe).
+2. **ANALIZAR qué ley lo regula** y qué derechos tiene el ciudadano.
+3. **INVESTIGAR pasos concretos** que debe seguir para resolver esto.
+4. **CALCULAR impacto económico** si es cuantificable.
+5. **PROPONER acciones inmediatas** citando normativa.
+
+NO digas "no hay problemas". El ciudadano REPORTÓ un problema. Tu trabajo es RESOLVERLO.`;
     }
 
     // --- PASO 1: GENERACIÓN (First Pass) ---
