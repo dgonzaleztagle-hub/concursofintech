@@ -67,6 +67,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   let bodyRef: UserProfile | null = null;
   let valorUF = 37650; // Fallback valor base
+  let problemaReportado: string | undefined;
 
   try {
     console.info("[Beeper API] Iniciando auditoría de salud financiera...");
@@ -91,7 +92,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     valorUF = econData.uf;
     const preventiveMode = body.preventiveMode === true;
     const productType = body.productType || "Crédito Consumo";
-    const problemaReportado: string | undefined = body.problemaReportado;
+    problemaReportado = body.problemaReportado;
 
     // --- CAPA DE SEGURIDAD 3: Detección de Fraude (PhishTank/CSIRT) ---
     const inst = profile.productos_financieros?.[0]?.institucion || "";
