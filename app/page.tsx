@@ -19,50 +19,44 @@ export default function Home() {
         {/* LCD Screen — menú de selección */}
         <div className="lcd-screen">
           <div className="scanline-effect" />
-          <div className="lcd-content justify-center gap-6">
+          <div className="lcd-content justify-center gap-5">
 
             <div className="text-center">
               <div className="lcd-label text-[11px]">SELECCIONA MÓDULO</div>
             </div>
 
-            {/* Opción 1: Juego educativo */}
-            <Link href="/aprende" className="block w-full group">
-              <div className="bg-[#1a2f1a] bg-opacity-10 border-2 border-[#1a2f1a] border-opacity-30 rounded-xl p-4 transition-all group-hover:bg-opacity-20 group-hover:border-opacity-60 group-active:scale-95">
-                <div className="flex items-center gap-3 mb-2">
-                  <span className="text-2xl">🎮</span>
-                  <div>
-                    <div className="text-[13px] font-black uppercase tracking-wide" style={{ color: "var(--lcd-dark)" }}>
-                      Aprende Finanzas
-                    </div>
-                    <div className="text-[10px] font-bold opacity-60" style={{ color: "var(--lcd-dark)" }}>
-                      Decisiones reales · Historia interactiva
-                    </div>
+            {/* Botones lado a lado */}
+            <div className="flex gap-3 w-full">
+              {/* Juego */}
+              <Link href="/aprende" className="flex-1 group">
+                <div className="flex flex-col items-center gap-2 bg-[#1a2f1a] bg-opacity-10 border-2 border-[#1a2f1a] border-opacity-30 rounded-xl p-4 transition-all group-hover:bg-opacity-20 group-hover:border-opacity-60 group-active:scale-95 text-center h-full">
+                  <span className="text-3xl">🎮</span>
+                  <div className="text-[12px] font-black uppercase tracking-wide leading-tight" style={{ color: "var(--lcd-dark)" }}>
+                    Aprende
+                  </div>
+                  <div className="text-[9px] font-bold opacity-50 leading-tight" style={{ color: "var(--lcd-dark)" }}>
+                    Historia interactiva
                   </div>
                 </div>
-              </div>
-            </Link>
+              </Link>
 
-            {/* Divisor */}
-            <div className="text-center">
-              <span className="text-[10px] font-black opacity-30 uppercase tracking-widest">— o —</span>
+              {/* Auditor — limpia caché al entrar */}
+              <Link
+                href="/auditor"
+                className="flex-1 group"
+                onClick={() => localStorage.removeItem("beeper_last_result")}
+              >
+                <div className="flex flex-col items-center gap-2 bg-[#1a2f1a] bg-opacity-10 border-2 border-[#1a2f1a] border-opacity-30 rounded-xl p-4 transition-all group-hover:bg-opacity-20 group-hover:border-opacity-60 group-active:scale-95 text-center h-full">
+                  <span className="text-3xl">🔍</span>
+                  <div className="text-[12px] font-black uppercase tracking-wide leading-tight" style={{ color: "var(--lcd-dark)" }}>
+                    Auditar
+                  </div>
+                  <div className="text-[9px] font-bold opacity-50 leading-tight" style={{ color: "var(--lcd-dark)" }}>
+                    Detecta abusos
+                  </div>
+                </div>
+              </Link>
             </div>
-
-            {/* Opción 2: Auditor Beeper */}
-            <Link href="/auditor" className="block w-full group">
-              <div className="bg-[#1a2f1a] bg-opacity-10 border-2 border-[#1a2f1a] border-opacity-30 rounded-xl p-4 transition-all group-hover:bg-opacity-20 group-hover:border-opacity-60 group-active:scale-95">
-                <div className="flex items-center gap-3 mb-2">
-                  <span className="text-2xl">🔍</span>
-                  <div>
-                    <div className="text-[13px] font-black uppercase tracking-wide" style={{ color: "var(--lcd-dark)" }}>
-                      Audita tus Finanzas
-                    </div>
-                    <div className="text-[10px] font-bold opacity-60" style={{ color: "var(--lcd-dark)" }}>
-                      Detecta abusos · Protege tu plata
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Link>
 
             {/* Footer */}
             <div className="text-center mt-auto">
