@@ -137,7 +137,7 @@ function PausaPanel({ pausa, onClose }: { pausa: PausaEducativa; onClose: () => 
         </p>
         <button onClick={onClose} className="text-[10px] font-bold opacity-50 hover:opacity-100" style={{ color: "var(--lcd-dark)" }}>✕</button>
       </div>
-      <p className="text-[11px] leading-relaxed mb-2" style={{ color: "var(--lcd-dark)" }}>"{pausa.explicacion}"</p>
+      <p className="text-[11px] leading-relaxed mb-2" style={{ color: "var(--lcd-dark)" }}>&ldquo;{pausa.explicacion}&rdquo;</p>
       <p className="text-[10px] italic opacity-70" style={{ color: "var(--lcd-dark)" }}>→ {pausa.preguntaReflexiva}</p>
     </div>
   );
