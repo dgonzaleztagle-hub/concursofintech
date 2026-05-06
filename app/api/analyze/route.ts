@@ -267,7 +267,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         is_preventive: true
       };
 
-      return NextResponse.json(selectedMock, { status: 200 });
+      const { is_mock: _removed, ...cleanMock } = selectedMock;
+      return NextResponse.json(cleanMock, { status: 200 });
     }
 
     // --- LÓGICA DE AUDITORÍA MANUAL DINÁMICA ---
@@ -327,7 +328,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       ...dynamicResult,
       uf_valor_usado: valorUF,
       timestamp: new Date().toISOString(),
-      is_mock: true
+      provider: "Motor Local"
     }, { status: 200 });
   }
 }

@@ -63,27 +63,15 @@ export function AlertCard({ result, onReset }: AlertCardProps) {
         <VoiceReporter result={result} />
       </div>
 
-      {/* Alerta de Modo Demo / Info de Proveedor */}
-      {result.is_mock ? (
-        <div className={`text-[8px] font-black px-2 py-1 rounded text-center border animate-pulse ${
-          result.provider === "Motor Offline Local" 
-            ? "bg-blue-400/20 text-blue-900 border-blue-500/30" 
-            : "bg-yellow-400/20 text-[#1a2f1a] border-yellow-500/30"
-        }`}>
-          {result.provider === "Motor Offline Local" 
-            ? "🛡️ MODO OFFLINE: PROTECCIÓN LOCAL ACTIVADA" 
-            : "⚠️ MODO DEMO: IA OFFLINE - USANDO REGLAS LOCALES"}
+      {/* Info de Proveedor */}
+      <div className="flex justify-between items-center bg-[#1a2f1a]/5 px-2 py-1 rounded border border-[#1a2f1a]/10">
+        <div className="text-[8px] font-black text-[#1a2f1a]/60 uppercase tracking-tighter">
+          PROCESADO POR:
         </div>
-      ) : (
-        <div className="flex justify-between items-center bg-[#1a2f1a]/5 px-2 py-1 rounded border border-[#1a2f1a]/10">
-          <div className="text-[8px] font-black text-[#1a2f1a]/60 uppercase tracking-tighter">
-            PROCESADO POR:
-          </div>
-          <div className="text-[8px] font-black text-[#1a2f1a] uppercase">
-            {result.provider || "Motor Estándar"}
-          </div>
+        <div className="text-[8px] font-black text-[#1a2f1a] uppercase">
+          {result.provider || "Motor Estándar"}
         </div>
-      )}
+      </div>
 
       {/* Estadísticas de Ahorro */}
       <AhorroStats 
