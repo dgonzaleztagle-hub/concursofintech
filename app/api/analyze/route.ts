@@ -14,11 +14,35 @@ import { fetchRealEconomicData } from "@/lib/utils/uf";
 import { anonymizeProfile } from "@/lib/utils/security";
 import { checkFinancialFraud } from "@/lib/utils/fraud";
 
+async function callGroq(systemPrompt: string, userPrompt: string): Promise<string> {
+  const groqKey = process.env.GROQ_API_KEY;
+  if (!groqKey) throw new Error("GROQ_API_KEY not set");
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${groqKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "llama-3.3-70b-versatile",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.3,
+      max_tokens: 2000,
+    }),
+  });
+  if (!res.ok) throw new Error(`Groq error ${res.status}: ${await res.text()}`);
+  const data = await res.json();
+  return data.choices[0].message.content as string;
+}
+
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const googleKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY || "";
   const anthropicKey = process.env.ANTHROPIC_API_KEY || "";
-  
-  console.info(`[Beeper API] Provider detectado: ${anthropicKey ? "Anthropic (Primario)" : "Google Gemini"}`);
+  const groqKey = process.env.GROQ_API_KEY || "";
+
+  const activeProvider = anthropicKey ? "Anthropic" : groqKey ? "Groq" : googleKey ? "Gemini" : "offline";
+  console.info(`[Beeper API] Provider detectado: ${activeProvider}`);
 
   const anthropic = anthropicKey ? new Anthropic({ apiKey: anthropicKey }) : null;
   const genAI = googleKey ? new GoogleGenerativeAI(googleKey) : null;
@@ -80,6 +104,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       });
       const text = (msg.content[0] as { text: string }).text;
       initialAnalysis = JSON.parse(text.substring(text.indexOf("{"), text.lastIndexOf("}") + 1));
+    } else if (groqKey) {
+      const text = await callGroq(
+        contextWithFraud,
+        `Analiza este perfil financiero y devuelve un JSON según las reglas:\n${JSON.stringify(profile, null, 2)}`
+      );
+      initialAnalysis = JSON.parse(text);
     } else if (modelGeneratorGemini) {
       const genResult = await modelGeneratorGemini.generateContent(genPrompt);
       initialAnalysis = JSON.parse(genResult.response.text());
@@ -117,6 +147,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       });
       const auditText = (auditMsg.content[0] as { text: string }).text;
       auditedJson = JSON.parse(auditText.substring(auditText.indexOf("{"), auditText.lastIndexOf("}") + 1));
+    } else if (groqKey) {
+      const auditText = await callGroq(
+        "Eres un Auditor Legal Financiero chileno. Responde solo con JSON válido.",
+        auditPrompt
+      );
+      auditedJson = JSON.parse(auditText);
     } else if (modelAuditorGemini) {
       const auditResult = await modelAuditorGemini.generateContent(auditPrompt);
       auditedJson = JSON.parse(auditResult.response.text());
@@ -134,7 +170,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       uf_valor_usado: valorUF,
       timestamp: new Date().toISOString(),
       version: "2.5-multi-provider",
-      provider: anthropic ? "Claude 3.5 Sonnet" : "Gemini 1.5 Flash"
+      provider: anthropic ? "Claude 3.5 Sonnet" : groqKey ? "Groq llama-3.3-70b" : "Gemini 1.5 Flash"
     };
 
     return NextResponse.json(response, { status: 200 });
