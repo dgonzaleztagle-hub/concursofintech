@@ -1,0 +1,238 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --lcd-bg: #d4e8b0; /* Verde más suave y legible */
+    --lcd-dark: #1a2f1a;
+    --lcd-glow: rgba(155, 188, 15, 0.3);
+    --glass-bg: rgba(255, 255, 255, 0.85);
+    --accent: #2d5a27;
+    --bg-gradient: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  }
+
+  body {
+    @apply min-h-screen m-0 overflow-hidden flex items-center justify-center;
+    background: var(--bg-gradient);
+    color: #333;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+}
+
+@layer components {
+  .beeper-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100vh;
+    padding: 20px;
+  }
+
+  .beeper-device {
+    background: var(--glass-bg);
+    backdrop-filter: blur(24px);
+    width: 480px; 
+    min-height: 720px;
+    border-radius: 48px;
+    padding: 40px;
+    box-shadow: 
+      0 30px 60px -12px rgba(0, 0, 0, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.6),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.05);
+    display: flex;
+    flex-direction: column;
+    gap: 25px;
+    position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+
+  .beeper-device:hover {
+    transform: translateY(-5px);
+    box-shadow: 
+      0 40px 80px -15px rgba(0, 0, 0, 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  }
+
+  .lcd-screen {
+    background-color: var(--lcd-bg);
+    border: 12px solid #222; /* Marco tipo monitor industrial moderno */
+    border-radius: 12px;
+    padding: 24px;
+    height: 480px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 
+      inset 0 0 50px rgba(0,0,0,0.15),
+      0 10px 20px rgba(0,0,0,0.1);
+  }
+
+  .lcd-screen::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 100%;
+    background: repeating-linear-gradient(
+      0deg,
+      rgba(0, 0, 0, 0.03) 0px,
+      rgba(0, 0, 0, 0.03) 1px,
+      transparent 1px,
+      transparent 2px
+    );
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  .lcd-content {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    color: var(--lcd-dark);
+  }
+
+  .lcd-text-large {
+    font-size: 32px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    font-family: 'Courier New', monospace;
+    text-transform: uppercase;
+  }
+
+  .lcd-label {
+    font-size: 13px;
+    text-transform: uppercase;
+    color: rgba(26, 47, 26, 0.6);
+    font-weight: 800;
+    letter-spacing: 0.1em;
+  }
+
+  .modern-button {
+    background: #222;
+    color: white;
+    padding: 18px 32px;
+    border-radius: 16px;
+    font-weight: 700;
+    font-size: 16px;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  }
+
+  .modern-button:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 15px rgba(0,0,0,0.2);
+    background: #000;
+  }
+
+  .modern-button:active {
+    transform: translateY(0);
+  }
+
+  .modern-input {
+    width: 100%;
+    background: rgba(0,0,0,0.05);
+    border: 2px solid rgba(0,0,0,0.1);
+    padding: 16px;
+    border-radius: 14px;
+    font-size: 20px;
+    font-weight: 700;
+    text-align: center;
+    color: #222;
+    transition: all 0.2s;
+  }
+
+  .modern-input:focus {
+    outline: none;
+    border-color: #222;
+    background: white;
+  }
+
+  .lcd-input {
+    width: 100%;
+    background: rgba(26, 47, 26, 0.05);
+    border: 2px solid var(--lcd-dark);
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 700;
+    font-family: 'Courier New', monospace;
+    color: var(--lcd-dark);
+    appearance: none; /* Quitar flecha default */
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    background-size: 1em;
+  }
+
+  .lcd-input:focus {
+    outline: none;
+    background: rgba(26, 47, 26, 0.1);
+  }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(212, 232, 176, 0.4); }
+  50% { box-shadow: 0 0 30px 10px rgba(212, 232, 176, 0.6); }
+}
+
+.pulse-modern {
+  animation: pulse-soft 2s infinite;
+}
+
+/* Custom Scrollbar for LCD */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(26, 47, 26, 0.3);
+  border-radius: 10px;
+}
+
+/* Custom Scrollbar for LCD Screen */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: var(--lcd-bg);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--lcd-dark);
+  border-radius: 2px;
+}
+
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--lcd-dark) var(--lcd-bg);
+}
+
+@keyframes scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+
+.scanline-effect {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100px;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(26, 47, 26, 0.05) 50%,
+    transparent 100%
+  );
+  animation: scanline 8s linear infinite;
+  pointer-events: none;
+  z-index: 6;
+}
