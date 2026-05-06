@@ -69,6 +69,7 @@ export default function AuditorPage() {
       <BeeperScreen
         isPulsing={state === "result" && result?.status !== "ok"}
         onSovereigntyClick={toggleSovereignty}
+        backHref="/"
       >
         {state === "idle" && (
           <div className="flex flex-col items-center justify-center h-full gap-4">
@@ -211,7 +212,14 @@ export default function AuditorPage() {
           />
         )}
 
-        {state === "scanning" && <LoadingBeeper />}
+        {state === "scanning" && (
+          <div className="flex flex-col items-center justify-center h-full gap-4">
+            <LoadingBeeper />
+            <button onClick={reset} className="text-[10px] font-bold uppercase opacity-40 hover:opacity-80 transition-opacity mt-2" style={{ color: "var(--lcd-dark)" }}>
+              ✕ Cancelar
+            </button>
+          </div>
+        )}
 
         {state === "error" && (
           <div className="flex flex-col items-center justify-center h-full gap-6 text-center animate-in fade-in">

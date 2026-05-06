@@ -395,11 +395,21 @@ export default function AprendePage() {
               Survival Game
             </div>
           </div>
-          {phase === "playing" && gameState && (
-            <div className="text-right">
+          {phase === "playing" && gameState ? (
+            <div className="flex flex-col items-end gap-1">
               <div className="text-[11px] font-black" style={{ color: "var(--lcd-dark)" }}>{gameState.puntuacionTotal} pts</div>
-              <div className="text-[9px] opacity-50 font-bold uppercase" style={{ color: "var(--lcd-dark)" }}>puntuación</div>
+              <button
+                onClick={handleReiniciar}
+                className="text-[9px] font-black uppercase opacity-40 hover:opacity-80 transition-opacity"
+                style={{ color: "var(--lcd-dark)" }}
+              >
+                ✕ Salir
+              </button>
             </div>
+          ) : (
+            <Link href="/" className="text-[10px] font-bold opacity-30 hover:opacity-60" style={{ color: "var(--lcd-dark)" }}>
+              ← Inicio
+            </Link>
           )}
         </div>
 
@@ -538,14 +548,6 @@ export default function AprendePage() {
           </div>
         )}
 
-        {/* Footer link */}
-        {phase !== "playing" && (
-          <div className="text-center">
-            <Link href="/" className="text-[10px] font-bold opacity-30 hover:opacity-60" style={{ color: "var(--lcd-dark)" }}>
-              ← Menú principal
-            </Link>
-          </div>
-        )}
       </div>
     </main>
   );
