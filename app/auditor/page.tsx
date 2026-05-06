@@ -11,7 +11,7 @@ import { AlertCard } from "@/components/AlertCard";
 import { LoadingBeeper } from "@/components/LoadingBeeper";
 import { SovereigntyView } from "@/components/SovereigntyView";
 import { BankConnectionView } from "@/components/BankConnectionView";
-import { useBeeperAudit, DEMO_SCENARIOS } from "@/lib/hooks/useBeeperAudit";
+import { useBeeperAudit } from "@/lib/hooks/useBeeperAudit";
 
 export default function AuditorPage() {
   const {
@@ -23,8 +23,6 @@ export default function AuditorPage() {
     manualProduct,
     manualInsurance,
     showWalletAlert,
-    selectedDemoId,
-    setSelectedDemoId,
     customProblem,
     setCustomProblem,
     setMode,
