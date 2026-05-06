@@ -267,7 +267,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         is_preventive: true
       };
 
-      const { is_mock: _removed, ...cleanMock } = selectedMock;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { is_mock, ...cleanMock } = selectedMock;
       return NextResponse.json(cleanMock, { status: 200 });
     }
 
