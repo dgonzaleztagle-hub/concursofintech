@@ -63,15 +63,6 @@ export function AlertCard({ result, onReset }: AlertCardProps) {
         <VoiceReporter result={result} />
       </div>
 
-      {/* Info de Proveedor */}
-      <div className="flex justify-between items-center bg-[#1a2f1a]/5 px-2 py-1 rounded border border-[#1a2f1a]/10">
-        <div className="text-[8px] font-black text-[#1a2f1a]/60 uppercase tracking-tighter">
-          PROCESADO POR:
-        </div>
-        <div className="text-[8px] font-black text-[#1a2f1a] uppercase">
-          {result.provider || "Motor Estándar"}
-        </div>
-      </div>
 
       {/* Estadísticas de Ahorro */}
       <AhorroStats 
