@@ -281,7 +281,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     // --- LÓGICA DE AUDITORÍA MANUAL DINÁMICA ---
     let dynamicResult: Partial<AnalysisResult> = {
       status: "ok",
-      diagnostico: `SISTEMA OK: Su ${affectedProduct} no presenta cobros atados ni duplicidades evidentes.`,
+      diagnostico: problemaReportado
+        ? `ANÁLISIS REPORTADO: Usted reportó: "${problemaReportado}". Su ${affectedProduct} no presenta cobros atados ni duplicidades evidentes.`
+        : `SISTEMA OK: Su ${affectedProduct} no presenta cobros atados ni duplicidades evidentes.`,
       ahorro_trimestral_clp: 0,
       ahorro_anual_clp: 0,
       educacion_financiera: "Mantener solo los seguros obligatorios es la mejor forma de optimizar su presupuesto mensual.",
