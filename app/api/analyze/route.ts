@@ -222,8 +222,10 @@ NO digas "no hay problemas". El ciudadano REPORTÓ un problema. Tu trabajo es RE
   } catch (error) {
     console.error("[Beeper API Error]:", error);
     if (error instanceof Error) {
-      console.error("[Beeper API Error Details]:", error.message);
+      console.error("[Beeper API Error Stack]:", error.message);
+      console.error("[Beeper API Error Stack Trace]:", error.stack);
     }
+    console.error("[Beeper API] Cayendo al fallback porque LLM falló. problemaReportado:", problemaReportado);
 
     // --- SISTEMA EXPERTO DE RESILIENCIA (Basado en Wiki Legal Chile) ---
     const bodyAny = bodyRef as Record<string, unknown> | null;
