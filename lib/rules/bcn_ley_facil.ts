@@ -139,9 +139,12 @@ export const BCN_LEY_FACIL_DB: LegalGuide[] = [
 ];
 
 export function getLegalPrompt(): string {
-  return BCN_LEY_FACIL_DB.map(guide => `
-[${guide.ley}] ${guide.resumen}
-Derechos Clave: ${guide.derechos_clave.join(", ")}
-Términos: ${Object.entries(guide.terminos_ciudadanos).map(([k, v]) => `${k}: ${v}`).join("; ")}
-  `).join("\n---\n");
+  return BCN_LEY_FACIL_DB.map(guide => {
+    const articulosSection = guide.articulos_clave?.length
+      ? `\nArtículos Clave:\n${guide.articulos_clave.map(a => `  • ${a.articulo}: ${a.implicancia}`).join("\n")}`
+      : "";
+    return `[${guide.ley}] ${guide.resumen}
+Derechos Clave: ${guide.derechos_clave.join(" | ")}${articulosSection}
+Términos: ${Object.entries(guide.terminos_ciudadanos).map(([k, v]) => `${k}: ${v}`).join("; ")}`;
+  }).join("\n---\n");
 }
