@@ -129,22 +129,34 @@ NO digas "no hay problemas". El ciudadano REPORTÓ un problema. Tu trabajo es RE
     let initialAnalysis: AnalysisResult;
 
     if (anthropic) {
+      const userMessage = problemaReportado
+        ? `PROBLEMA REPORTADO: "${problemaReportado}"\n\nBasándote en SOLO el problema reportado y la normativa chilena, proporciona análisis, leyes aplicables, y acciones concretas. NO digas "no hay problemas".\n\nPerfil contextual:\n${JSON.stringify(profile, null, 2)}`
+        : `Analiza este perfil financiero y devuelve un JSON según las reglas:\n${JSON.stringify(profile, null, 2)}`;
+
       const msg = await anthropic.messages.create({
         model: "claude-3-5-sonnet-20240620",
         max_tokens: 2000,
         system: contextWithFraud,
-        messages: [{ role: "user", content: `Analiza este perfil financiero y devuelve un JSON según las reglas:\n${JSON.stringify(profile, null, 2)}` }],
+        messages: [{ role: "user", content: userMessage }],
       });
       const text = (msg.content[0] as { text: string }).text;
       initialAnalysis = JSON.parse(text.substring(text.indexOf("{"), text.lastIndexOf("}") + 1));
     } else if (groqKey) {
+      const groqUserMessage = problemaReportado
+        ? `PROBLEMA REPORTADO: "${problemaReportado}"\n\nBasándote en SOLO el problema reportado y la normativa chilena, proporciona análisis, leyes aplicables, y acciones concretas. NO digas "no hay problemas".\n\nPerfil contextual:\n${JSON.stringify(profile, null, 2)}`
+        : `Analiza este perfil financiero y devuelve un JSON según las reglas:\n${JSON.stringify(profile, null, 2)}`;
+
       const text = await callGroq(
         contextWithFraud,
-        `Analiza este perfil financiero y devuelve un JSON según las reglas:\n${JSON.stringify(profile, null, 2)}`
+        groqUserMessage
       );
       initialAnalysis = JSON.parse(text);
     } else if (modelGeneratorGemini) {
-      const genResult = await modelGeneratorGemini.generateContent(genPrompt);
+      const geminiPrompt = problemaReportado
+        ? `${contextWithFraud}\n\n${inclusionRules}\n\nPROBLEMA REPORTADO: "${problemaReportado}"\n\nBasándote en SOLO el problema reportado y la normativa chilena, proporciona análisis, leyes aplicables, y acciones concretas. NO digas "no hay problemas".\n\nPerfil contextual:\n${JSON.stringify(profile, null, 2)}`
+        : genPrompt;
+
+      const genResult = await modelGeneratorGemini.generateContent(geminiPrompt);
       initialAnalysis = JSON.parse(genResult.response.text());
     } else {
       throw new Error("No hay proveedores de IA disponibles");
