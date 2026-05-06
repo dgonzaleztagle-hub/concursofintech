@@ -146,8 +146,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     // --- SISTEMA EXPERTO DE RESILIENCIA (Basado en Wiki Legal Chile) ---
-    const isPreventive = bodyRef?.preventiveMode === true;
-    const pType = bodyRef?.productType || "Crédito Consumo";
+    const bodyAny = bodyRef as Record<string, unknown> | null;
+    const isPreventive = bodyAny?.preventiveMode === true;
+    const pType = (bodyAny?.productType as string) || "Crédito Consumo";
 
     const profile = bodyRef as UserProfile;
     const mainProduct = profile?.productos_financieros?.[0];

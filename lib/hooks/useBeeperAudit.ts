@@ -72,7 +72,7 @@ export function useBeeperAudit() {
   useEffect(() => {
     const savedData = loadSecurely("beeper_last_result");
     if (savedData) {
-      setResult(savedData);
+      setResult(savedData as AnalysisResult);
       setState("result");
     }
   }, []);
@@ -104,6 +104,7 @@ export function useBeeperAudit() {
       educacion_financiera: "Incluso sin conexión, el Beeper protege sus derechos usando las reglas de la Wiki Legal.",
       accion: "Revisar su estado de cuenta mensual buscando cobros duplicados.",
       derecho_regulatorio: "Normativa General CMF",
+      uf_valor_usado: 37650,
       timestamp: new Date().toISOString(),
       is_mock: true,
       provider: "Motor Offline Local"

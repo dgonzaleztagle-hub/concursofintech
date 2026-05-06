@@ -328,7 +328,7 @@ export default function AprendePage() {
         deudas: deudasNuevas,
         relacionesFamilia: familiaNew,
         relacionesAmigos: amigosNew,
-        conceptosAprendidos: [...new Set([...prev.conceptosAprendidos, conceptoId])],
+        conceptosAprendidos: Array.from(new Set([...prev.conceptosAprendidos, conceptoId])),
         decisiones: [...prev.decisiones, {
           turno: prev.turno,
           textoJugador: respuesta,

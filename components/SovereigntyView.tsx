@@ -17,7 +17,7 @@ interface SovereigntyViewProps {
   onBack: () => void;
 }
 
-export function SovereigntyView({ consents, onToggleConsent, onExport, onBack }: SovereigntyViewProps) {
+export function SovereigntyView({ consents, onToggleConsent, onExport, onDeleteFootprint, onBack }: SovereigntyViewProps) {
   return (
     <div className="flex flex-col h-full gap-3 animate-in fade-in duration-500">
       <div className="text-center mb-2">
