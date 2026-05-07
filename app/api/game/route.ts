@@ -188,7 +188,7 @@ interface Decision {
 }
 
 interface GameRequest {
-  fase: "init" | "evaluar_decision";
+  fase: "init" | "evaluar_decision" | "mentor";
   edad?: number;
   turno?: number;
   conceptoActual?: string;
@@ -200,6 +200,8 @@ interface GameRequest {
   relacionesAmigos?: number;
   conceptosAprendidosArray?: string[];
   objetivoActual?: string;
+  preguntaMentor?: string;
+  puntuacionTotal?: number;
 }
 
 function getSecuenciaConceptos(edad: number): string[] {
@@ -370,6 +372,60 @@ ${alertas.length > 0 ? "   IMPORTANTE: refleja la crisis en el siguiente escenar
 Responde como JSON puro válido. Sin markdown.`;
 }
 
+function buildMentorPrompt(input: GameRequest): string {
+  const conceptos = input.conceptosAprendidosArray || [];
+  const decisiones = input.historialDecisiones || [];
+
+  return `Actúa como mentor financiero post-partida para un joven en Chile.
+
+REGLAS:
+- Responde SOLO sobre lo aprendido en esta partida.
+- No recalcules saldo, deuda, puntos ni salud. Esos datos ya son definitivos.
+- No introduzcas temas que no aparecieron en conceptos o decisiones.
+- Si la pregunta se sale de la partida, redirige con cariño hacia un concepto visto.
+- Lenguaje simple, concreto, máximo 4 oraciones.
+- Cierra con una acción práctica que el jugador podría aplicar en la vida diaria.
+
+RESUMEN DE PARTIDA:
+- Edad: ${input.edad || "no indicada"}
+- Puntaje final: ${input.puntuacionTotal ?? 0}
+- Saldo final: $${(input.saldoActual ?? 0).toLocaleString("es-CL")}
+- Deuda final: $${(input.deudasActuales ?? 0).toLocaleString("es-CL")}
+- Relación familia: ${input.relacionesFamilia ?? 0}/100
+- Relación amigos: ${input.relacionesAmigos ?? 0}/100
+- Conceptos vistos: ${conceptos.join(", ") || "ninguno registrado"}
+- Decisiones:
+${decisiones.map(d => `  - Turno ${d.turno}: "${d.textoJugador}" | concepto: ${d.conceptoIdentificado} | puntos: ${d.puntos}`).join("\n") || "  - Sin decisiones registradas"}
+
+PREGUNTA DEL JUGADOR:
+"${input.preguntaMentor || "Resume lo que aprendí."}"
+
+Responde como JSON puro válido:
+{
+  "answer": "respuesta del mentor",
+  "suggestions": ["pregunta sugerida 1", "pregunta sugerida 2", "pregunta sugerida 3"]
+}`;
+}
+
+function buildLocalMentor(input: GameRequest) {
+  const conceptos = input.conceptosAprendidosArray || [];
+  const deuda = input.deudasActuales ?? 0;
+  const saldo = input.saldoActual ?? 0;
+  const conceptoPrincipal = conceptos[conceptos.length - 1] || conceptos[0] || "presupuesto";
+  const estado = deuda > saldo
+    ? "Tu partida mostró que la deuda puede quitarte margen aunque una decisión parezca resolver el momento."
+    : "Tu partida mostró que decidir antes de gastar te deja más margen para elegir después.";
+
+  return {
+    answer: `${estado} Lo más importante que viste fue ${conceptoPrincipal.replace(/_/g, " ")}: mirar el costo completo de una decisión, no solo si puedes pagarla ahora. Para llevarlo a la vida real, antes de comprar algo separa primero lo necesario y decide un límite para lo demás.`,
+    suggestions: [
+      "¿Qué decisión me costó más?",
+      "¿Cómo evito endeudarme?",
+      "¿Qué concepto debería recordar?"
+    ]
+  };
+}
+
 function buildLocalGameMaster(input: GameRequest) {
   const edad = input.edad || 13;
 
@@ -460,10 +516,10 @@ export async function POST(req: Request) {
 
   const availableProviders = PROVIDERS.filter(p => p.key());
   if (availableProviders.length === 0) {
-    return NextResponse.json(buildLocalGameMaster(input), { status: 200 });
+    return NextResponse.json(input.fase === "mentor" ? buildLocalMentor(input) : buildLocalGameMaster(input), { status: 200 });
   }
 
-  const userPrompt = buildPrompt(input);
+  const userPrompt = input.fase === "mentor" ? buildMentorPrompt(input) : buildPrompt(input);
   let content = "";
 
   for (const provider of availableProviders) {
@@ -507,7 +563,7 @@ export async function POST(req: Request) {
   }
 
   if (!content) {
-    return NextResponse.json(buildLocalGameMaster(input), { status: 200 });
+    return NextResponse.json(input.fase === "mentor" ? buildLocalMentor(input) : buildLocalGameMaster(input), { status: 200 });
   }
 
   let gm: Record<string, unknown>;
@@ -516,7 +572,14 @@ export async function POST(req: Request) {
     gm = JSON.parse(jsonStr);
   } catch {
     console.error("JSON parse failed:", content.slice(0, 200));
-    return NextResponse.json(buildLocalGameMaster(input), { status: 200 });
+    return NextResponse.json(input.fase === "mentor" ? buildLocalMentor(input) : buildLocalGameMaster(input), { status: 200 });
+  }
+
+  if (input.fase === "mentor") {
+    return NextResponse.json({
+      answer: typeof gm.answer === "string" ? gm.answer : buildLocalMentor(input).answer,
+      suggestions: Array.isArray(gm.suggestions) ? gm.suggestions.slice(0, 3) : buildLocalMentor(input).suggestions,
+    });
   }
 
   const narracion = (gm.narracion as string) || (gm.narración as string) || "";

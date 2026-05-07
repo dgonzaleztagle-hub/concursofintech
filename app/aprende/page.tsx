@@ -58,6 +58,11 @@ interface FeedbackState {
   nextSalud?: SaludFinanciera;
 }
 
+interface MentorMessage {
+  role: "player" | "mentor";
+  text: string;
+}
+
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
 function getNarracion(e?: Escenario | null): string {
@@ -207,20 +212,142 @@ function AgeSelector({ onSelect, loading }: { onSelect: (age: number) => void; l
 
 // ─── summary ─────────────────────────────────────────────────────────────────
 
-function ResumenFinal({ puntuacion, conceptos, onReiniciar }: {
-  puntuacion: number; conceptos: string[]; onReiniciar: () => void;
+function conceptLabel(concepto: string) {
+  return concepto.replace(/_/g, " ");
+}
+
+function MentorChat({
+  messages,
+  input,
+  suggestions,
+  loading,
+  onInputChange,
+  onAsk,
+}: {
+  messages: MentorMessage[];
+  input: string;
+  suggestions: string[];
+  loading: boolean;
+  onInputChange: (value: string) => void;
+  onAsk: (question?: string) => void;
 }) {
-  const nivel = puntuacion >= 600 ? "EXPERTO FINANCIERO" : puntuacion >= 350 ? "EN CAMINO" : "APRENDIZ";
   return (
-    <div className="lcd-content justify-center gap-4">
+    <div className="w-full space-y-2">
+      <div className="lcd-label text-[9px]">MENTOR POST-PARTIDA</div>
+      <div className="rounded-lg p-2 space-y-2" style={{ background: "rgba(26,47,26,0.07)", border: "1px solid rgba(26,47,26,0.22)" }}>
+        <div className="max-h-28 overflow-y-auto space-y-2 pr-1">
+          {messages.length === 0 ? (
+            <p className="text-[10px] leading-relaxed opacity-70" style={{ color: "var(--lcd-dark)" }}>
+              Pregunta algo sobre lo que acabas de vivir en esta partida.
+            </p>
+          ) : messages.map((m, idx) => (
+            <div
+              key={`${m.role}-${idx}`}
+              className="rounded-md px-2 py-1.5 text-[10px] leading-relaxed"
+              style={{
+                background: m.role === "mentor" ? "rgba(26,47,26,0.12)" : "rgba(255,255,255,0.24)",
+                color: "var(--lcd-dark)",
+              }}
+            >
+              <span className="font-black uppercase opacity-60">{m.role === "mentor" ? "Mentor" : "Tú"}: </span>
+              {m.text}
+            </div>
+          ))}
+          {loading && (
+            <p className="text-[10px] font-bold animate-pulse opacity-60" style={{ color: "var(--lcd-dark)" }}>
+              Pensando con tu historial...
+            </p>
+          )}
+        </div>
+
+        {suggestions.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {suggestions.map(s => (
+              <button
+                key={s}
+                onClick={() => onAsk(s)}
+                disabled={loading}
+                className="rounded-full px-2 py-1 text-[9px] font-bold disabled:opacity-50"
+                style={{ background: "rgba(26,47,26,0.12)", color: "var(--lcd-dark)" }}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="flex gap-1">
+          <input
+            value={input}
+            onChange={e => onInputChange(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === "Enter") onAsk();
+            }}
+            disabled={loading}
+            className="flex-1 rounded-md px-2 py-2 text-[10px] font-bold outline-none disabled:opacity-50"
+            style={{
+              background: "rgba(255,255,255,0.35)",
+              border: "1px solid rgba(26,47,26,0.25)",
+              color: "var(--lcd-dark)",
+            }}
+            placeholder="Pregunta sobre tu partida..."
+          />
+          <button
+            onClick={() => onAsk()}
+            disabled={loading || input.trim().length === 0}
+            className="rounded-md px-3 text-[10px] font-black disabled:opacity-40"
+            style={{ background: "var(--lcd-dark)", color: "#d7f0b9" }}
+          >
+            OK
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ResumenFinal({ gameState, salud, mentorMessages, mentorInput, mentorSuggestions, mentorLoading, onMentorInputChange, onMentorAsk, onReiniciar }: {
+  gameState: GameState;
+  salud: SaludFinanciera | null;
+  mentorMessages: MentorMessage[];
+  mentorInput: string;
+  mentorSuggestions: string[];
+  mentorLoading: boolean;
+  onMentorInputChange: (value: string) => void;
+  onMentorAsk: (question?: string) => void;
+  onReiniciar: () => void;
+}) {
+  const { puntuacionTotal, conceptosAprendidos, decisiones, saldo, deudas, relacionesFamilia, relacionesAmigos } = gameState;
+  const puntuacion = puntuacionTotal;
+  const conceptos = conceptosAprendidos;
+  const nivel = puntuacion >= 600 ? "EXPERTO FINANCIERO" : puntuacion >= 350 ? "EN CAMINO" : "APRENDIZ";
+  const cierre = deudas > saldo
+    ? "Terminaste con presión financiera: aprendiste que resolver el momento puede salir caro si deja deuda."
+    : "Terminaste con margen financiero: aprendiste a elegir sin perder tanto control del dinero.";
+
+  return (
+    <div className="lcd-content gap-3">
       <div className="text-center">
-        <div className="lcd-text-large" style={{ fontSize: "20px" }}>FIN</div>
+        <div className="lcd-text-large" style={{ fontSize: "20px" }}>GAME OVER</div>
         <div className="lcd-label text-[10px] mt-1">{nivel}</div>
       </div>
 
-      <div className="text-center">
-        <div className="text-[28px] font-black" style={{ color: "var(--lcd-dark)" }}>{puntuacion}</div>
-        <div className="text-[10px] font-bold opacity-60" style={{ color: "var(--lcd-dark)" }}>PUNTOS TOTALES</div>
+      <p className="text-[11px] leading-relaxed text-center" style={{ color: "var(--lcd-dark)" }}>{cierre}</p>
+
+      <div className="grid grid-cols-2 gap-2 w-full">
+        {[
+          ["PUNTOS", puntuacion.toLocaleString("es-CL")],
+          ["SALUD", salud?.valor ?? "-"],
+          ["SALDO", `$${saldo.toLocaleString("es-CL")}`],
+          ["DEUDA", `$${deudas.toLocaleString("es-CL")}`],
+          ["FAMILIA", relacionesFamilia],
+          ["AMIGOS", relacionesAmigos],
+        ].map(([label, value]) => (
+          <div key={label} className="rounded-md px-2 py-1.5 text-center" style={{ background: "rgba(26,47,26,0.1)", color: "var(--lcd-dark)" }}>
+            <div className="text-[8px] font-black opacity-50">{label}</div>
+            <div className="text-[12px] font-black">{value}</div>
+          </div>
+        ))}
       </div>
 
       {conceptos.length > 0 && (
@@ -229,12 +356,34 @@ function ResumenFinal({ puntuacion, conceptos, onReiniciar }: {
           <div className="flex flex-wrap gap-1">
             {conceptos.map(c => (
               <span key={c} className="text-[9px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(26,47,26,0.15)", color: "var(--lcd-dark)" }}>
-                {c.replace(/_/g, " ")}
+                {conceptLabel(c)}
               </span>
             ))}
           </div>
         </div>
       )}
+
+      {decisiones.length > 0 && (
+        <div className="w-full">
+          <div className="lcd-label text-[9px] mb-1">DECISIONES CLAVE:</div>
+          <div className="space-y-1 max-h-20 overflow-y-auto">
+            {decisiones.slice(-4).map(d => (
+              <div key={`${d.turno}-${d.textoJugador}`} className="text-[10px] leading-snug" style={{ color: "var(--lcd-dark)" }}>
+                <span className="font-black">T{d.turno}</span> · {conceptLabel(d.conceptoIdentificado)} · +{d.puntos} pts
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <MentorChat
+        messages={mentorMessages}
+        input={mentorInput}
+        suggestions={mentorSuggestions}
+        loading={mentorLoading}
+        onInputChange={onMentorInputChange}
+        onAsk={onMentorAsk}
+      />
 
       <button onClick={onReiniciar} className="modern-button w-full mt-auto" style={{ fontSize: "13px" }}>
         ↺ JUGAR DE NUEVO
@@ -255,6 +404,14 @@ export default function AprendePage() {
   const [feedback, setFeedback] = useState<FeedbackState | null>(null);
   const [pausaVisible, setPausaVisible] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [mentorLoading, setMentorLoading] = useState(false);
+  const [mentorInput, setMentorInput] = useState("");
+  const [mentorMessages, setMentorMessages] = useState<MentorMessage[]>([]);
+  const [mentorSuggestions, setMentorSuggestions] = useState([
+    "¿Qué aprendí?",
+    "¿Dónde me equivoqué?",
+    "¿Cómo lo aplico?"
+  ]);
   const [phase, setPhase] = useState<"select" | "playing" | "finished">("select");
 
   // ── init ───────────────────────────────────────────────────────────────────
@@ -290,6 +447,8 @@ export default function AprendePage() {
       setCurrentScenario(primerEscenario);
       setFeedback(null);
       setPausaVisible(true);
+      setMentorInput("");
+      setMentorMessages([]);
       setPhase("playing");
     } catch (err) {
       console.error(err);
@@ -382,6 +541,11 @@ export default function AprendePage() {
     ) {
       setFeedback(null);
       setPhase("finished");
+      setMentorSuggestions([
+        "¿Qué aprendí?",
+        "¿Cuál fue mi mejor decisión?",
+        "¿Cómo evito deuda?"
+      ]);
       return;
     }
     if (feedback?.nextScenario) {
@@ -397,7 +561,58 @@ export default function AprendePage() {
     setCurrentScenario(null);
     setSalud(null);
     setFeedback(null);
+    setMentorInput("");
+    setMentorMessages([]);
+    setMentorSuggestions([
+      "¿Qué aprendí?",
+      "¿Dónde me equivoqué?",
+      "¿Cómo lo aplico?"
+    ]);
     setPhase("select");
+  };
+
+  const handleMentorAsk = async (question?: string) => {
+    if (!gameState || mentorLoading) return;
+    const pregunta = (question || mentorInput).trim();
+    if (!pregunta) return;
+
+    setMentorInput("");
+    setMentorLoading(true);
+    setMentorMessages(prev => [...prev, { role: "player", text: pregunta }]);
+
+    try {
+      const res = await fetch("/api/game", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fase: "mentor",
+          edad: gameState.edad,
+          preguntaMentor: pregunta,
+          historialDecisiones: gameState.decisiones,
+          conceptosAprendidosArray: gameState.conceptosAprendidos,
+          saldoActual: gameState.saldo,
+          deudasActuales: gameState.deudas,
+          relacionesFamilia: gameState.relacionesFamilia,
+          relacionesAmigos: gameState.relacionesAmigos,
+          puntuacionTotal: gameState.puntuacionTotal,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || typeof data.answer !== "string") throw new Error("Mentor no disponible");
+
+      setMentorMessages(prev => [...prev, { role: "mentor", text: data.answer }]);
+      if (Array.isArray(data.suggestions)) {
+        setMentorSuggestions(data.suggestions.filter((s: unknown): s is string => typeof s === "string").slice(0, 3));
+      }
+    } catch (err) {
+      console.error(err);
+      setMentorMessages(prev => [...prev, {
+        role: "mentor",
+        text: "Puedo ayudarte con lo que ocurrió en esta partida: saldo, deuda, decisiones y conceptos aprendidos. Prueba preguntarme qué decisión fue más importante."
+      }]);
+    } finally {
+      setMentorLoading(false);
+    }
   };
 
   // ── renders ────────────────────────────────────────────────────────────────
@@ -457,8 +672,14 @@ export default function AprendePage() {
           {/* FINISHED */}
           {phase === "finished" && gameState && (
             <ResumenFinal
-              puntuacion={gameState.puntuacionTotal}
-              conceptos={gameState.conceptosAprendidos}
+              gameState={gameState}
+              salud={salud}
+              mentorMessages={mentorMessages}
+              mentorInput={mentorInput}
+              mentorSuggestions={mentorSuggestions}
+              mentorLoading={mentorLoading}
+              onMentorInputChange={setMentorInput}
+              onMentorAsk={handleMentorAsk}
               onReiniciar={handleReiniciar}
             />
           )}
