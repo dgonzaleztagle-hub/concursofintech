@@ -296,6 +296,151 @@ function buildNextObjective(input: GameRequest, economy: ReturnType<typeof compu
   };
 }
 
+function getLocalScenario(turnInput: number, edad: number) {
+  const turn = clampNumber(turnInput, 1, 10, 1);
+  const teen = edad >= 13;
+  const scenarios = [
+    {
+      concepto: "dinero",
+      ubicacion: "casa",
+      narracion: `Recibiste ${teen ? "$120.000 por trabajos de fin de semana" : "$50.000 de mesada"} y el chat del curso ya tiene panorama. La plata se siente grande cuando acaba de llegar, pero se achica rápido cuando todos opinan qué deberías hacer con ella.`,
+      opciones: [
+        { id: "opcion_a", texto: "Separar primero lo necesario y poner un límite para salir.", consecuenciaHint: "Controlas el dinero antes de usarlo." },
+        { id: "opcion_b", texto: "Salir al mall y decidir allá cuánto gastar.", consecuenciaHint: "Mantienes el ritmo del grupo, pero pierdes control." }
+      ],
+      personajes: [
+        { nombre: "Mamá", rol: "familia", estadoEmocional: "atenta" },
+        { nombre: "Tomás", rol: "amigo", estadoEmocional: "entusiasmado" }
+      ],
+    },
+    {
+      concepto: "gastos",
+      ubicacion: "colegio",
+      narracion: "Al otro día aparece el primer gasto chico: colación, transporte y una cooperación para una actividad. Nada parece grave por separado, pero todos juntos empiezan a morder el saldo.",
+      opciones: [
+        { id: "opcion_a", texto: "Comparar precios y elegir la opción más barata.", consecuenciaHint: "Cuidas saldo sin cancelar todo." },
+        { id: "opcion_b", texto: "Pagar rápido para no quedar mal con el grupo.", consecuenciaHint: "Evitas incomodidad ahora, pero gastas más." }
+      ],
+      personajes: [
+        { nombre: "Tomás", rol: "amigo", estadoEmocional: "apurado" },
+        { nombre: "Mamá", rol: "familia", estadoEmocional: "observadora" }
+      ],
+    },
+    {
+      concepto: "necesidad_vs_deseo",
+      ubicacion: "mall",
+      narracion: "Ves una oferta que termina hoy, justo al lado de algo que sí necesitas para la semana. La pantalla dice descuento, pero tu saldo dice que no todo puede entrar.",
+      opciones: [
+        { id: "opcion_a", texto: "Comprar primero lo necesario y esperar con el gusto.", consecuenciaHint: "Priorizas estabilidad." },
+        { id: "opcion_b", texto: "Aprovechar la oferta de marca antes de que se acabe.", consecuenciaHint: "Satisfacción rápida, menos margen." }
+      ],
+      personajes: [
+        { nombre: "Antonia", rol: "amiga", estadoEmocional: "convencida" },
+        { nombre: "Tío Leo", rol: "familia", estadoEmocional: "práctico" }
+      ],
+    },
+    {
+      concepto: "ahorro",
+      ubicacion: "casa",
+      narracion: "Tu familia menciona un gasto que viene a fin de mes. Nadie te obliga a aportar, pero por primera vez entiendes que guardar plata también puede ser una decisión activa.",
+      opciones: [
+        { id: "opcion_a", texto: "Guardar una parte antes de seguir gastando.", consecuenciaHint: "Creas margen para imprevistos." },
+        { id: "opcion_b", texto: "Usar esa plata en una salida con amigos.", consecuenciaHint: "Sube lo social, baja el colchón." }
+      ],
+      personajes: [
+        { nombre: "Mamá", rol: "familia", estadoEmocional: "cansada" },
+        { nombre: "Tomás", rol: "amigo", estadoEmocional: "insistente" }
+      ],
+    },
+    {
+      concepto: "presupuesto",
+      ubicacion: "micro",
+      narracion: "La semana se partió en varios gastos: transporte, comida y compromisos chicos. Si no haces un plan, cada decisión parece independiente aunque todas salgan del mismo bolsillo.",
+      opciones: [
+        { id: "opcion_a", texto: "Armar un presupuesto simple antes de aceptar nuevos planes.", consecuenciaHint: "Decides con mapa." },
+        { id: "opcion_b", texto: "Ir resolviendo gasto por gasto sin anotar nada.", consecuenciaHint: "Funciona hoy, confunde mañana." }
+      ],
+      personajes: [
+        { nombre: "Abuelo", rol: "familia", estadoEmocional: "tranquilo" },
+        { nombre: "Antonia", rol: "amiga", estadoEmocional: "impaciente" }
+      ],
+    },
+    {
+      concepto: "costo_oportunidad",
+      ubicacion: "plaza",
+      narracion: "Aparecen dos planes buenos el mismo día. Puedes hacer uno completo o intentar los dos a medias, pero el dinero y el tiempo no alcanzan para todo.",
+      opciones: [
+        { id: "opcion_a", texto: "Elegir el plan más importante y dejar el otro para después.", consecuenciaHint: "Aceptas el costo de elegir." },
+        { id: "opcion_b", texto: "Intentar hacer ambos aunque tengas que pedir prestado.", consecuenciaHint: "No renuncias, pero compras presión." }
+      ],
+      personajes: [
+        { nombre: "Tomás", rol: "amigo", estadoEmocional: "expectante" },
+        { nombre: "Mamá", rol: "familia", estadoEmocional: "preocupada" }
+      ],
+    },
+    {
+      concepto: teen ? "deuda" : "gastos_hormiga",
+      ubicacion: "almacen",
+      narracion: teen
+        ? "Te ofrecen cubrir un gasto con plata prestada y devolverla después. Suena simple, hasta que miras que el próximo ingreso todavía no llega."
+        : "Compras chicos de camino empiezan a repetirse: bebida, snack, una recarga. No duelen una vez, pero juntos pesan.",
+      opciones: [
+        { id: "opcion_a", texto: "Esperar y ajustar el gasto al dinero disponible.", consecuenciaHint: "Evitas arrastrar el problema." },
+        { id: "opcion_b", texto: "Pedir prestado para resolverlo ahora.", consecuenciaHint: "Sales del paso, entra deuda." }
+      ],
+      personajes: [
+        { nombre: "Tío Leo", rol: "familia", estadoEmocional: "directo" },
+        { nombre: "Antonia", rol: "amiga", estadoEmocional: "relajada" }
+      ],
+    },
+    {
+      concepto: teen ? "interes_simple" : "valor_vs_precio",
+      ubicacion: teen ? "banco" : "feria",
+      narracion: teen
+        ? "La deuda ya no es solo el monto inicial: aparece un extra por pagar después. Ese cargo chico cambia toda la cuenta."
+        : "Dos productos parecen iguales, pero uno dura más y otro cuesta menos. El precio más bajo no siempre es el mejor valor.",
+      opciones: [
+        { id: "opcion_a", texto: teen ? "Calcular el total antes de aceptar cuotas." : "Comparar duración y precio antes de comprar.", consecuenciaHint: "Miras el costo completo." },
+        { id: "opcion_b", texto: teen ? "Aceptar las cuotas porque el pago mensual se ve bajo." : "Comprar el más barato sin revisar calidad.", consecuenciaHint: "Se ve fácil ahora, puede salir más caro." }
+      ],
+      personajes: [
+        { nombre: "Abuelo", rol: "familia", estadoEmocional: "serio" },
+        { nombre: "Tomás", rol: "amigo", estadoEmocional: "apurado" }
+      ],
+    },
+    {
+      concepto: teen ? "fondo_emergencia" : "ahorro",
+      ubicacion: "casa",
+      narracion: "Pasa algo que nadie planificó: un arreglo, una compra urgente o un cambio de planes. La pregunta ya no es si querías gastar, sino si tenías margen para resistir.",
+      opciones: [
+        { id: "opcion_a", texto: "Usar solo una parte y guardar algo para emergencia.", consecuenciaHint: "Proteges el cierre." },
+        { id: "opcion_b", texto: "Cubrir todo ahora y ver después cómo te arreglas.", consecuenciaHint: "Resuelves fuerte, quedas justo." }
+      ],
+      personajes: [
+        { nombre: "Mamá", rol: "familia", estadoEmocional: "agradecida" },
+        { nombre: "Antonia", rol: "amiga", estadoEmocional: "comprensiva" }
+      ],
+    },
+    {
+      concepto: teen ? "derechos_financieros" : "presupuesto",
+      ubicacion: teen ? "app bancaria" : "casa",
+      narracion: teen
+        ? "Revisas tus movimientos finales y aparece un cobro que no recuerdas. Ya no se trata solo de gastar bien: también tienes que saber revisar, preguntar y defender tu plata."
+        : "Llegas al cierre de la semana. Tu saldo, tus deudas y tus relaciones muestran lo que cada decisión fue construyendo.",
+      opciones: [
+        { id: "opcion_a", texto: teen ? "Revisar el detalle, guardar respaldo y consultar antes de pagar." : "Revisar el presupuesto y decidir qué mejorar.", consecuenciaHint: "Cierras con aprendizaje." },
+        { id: "opcion_b", texto: teen ? "Pagar rápido para que no molesten más." : "Ignorar el resumen y partir de cero la próxima vez.", consecuenciaHint: "Evitas fricción, pierdes aprendizaje." }
+      ],
+      personajes: [
+        { nombre: "Mamá", rol: "familia", estadoEmocional: "orgullosa" },
+        { nombre: "Tío Leo", rol: "familia", estadoEmocional: "atento" }
+      ],
+    },
+  ];
+
+  return { ...scenarios[turn - 1], turno: turn };
+}
+
 function buildPrompt(input: GameRequest): string {
   const edad = input.edad || 13;
   const edadGroup = edad <= 12 ? "10-12" : edad <= 13 ? "12-13" : "14-16";
@@ -442,23 +587,18 @@ function buildLocalGameMaster(input: GameRequest) {
 
   if (input.fase === "init") {
     const initialSaldo = edad <= 12 ? 50000 : 120000;
+    const scenario = getLocalScenario(1, edad);
     return {
-      message: `Es viernes por la tarde y acabas de recibir $${initialSaldo.toLocaleString("es-CL")}. En el chat del curso todos hablan de juntarse en el mall, pero en la casa también quedó pendiente comprar algo que necesitas para la semana.\n\nTienes la plata en la mano y una decisión simple que no se siente tan simple: usarla para pasarlo bien ahora o guardarte margen para no quedar justo después.`,
-      conceptoEnsenado: "dinero",
+      message: scenario.narracion,
+      conceptoEnsenado: scenario.concepto,
       puntos: 0,
       escenario: {
-        narracion: `Es viernes por la tarde y acabas de recibir $${initialSaldo.toLocaleString("es-CL")}. En el chat del curso todos hablan de juntarse en el mall, pero en la casa también quedó pendiente comprar algo que necesitas para la semana.\n\nTienes la plata en la mano y una decisión simple que no se siente tan simple: usarla para pasarlo bien ahora o guardarte margen para no quedar justo después.`,
-        opciones: [
-          { id: "opcion_a", texto: "Ir al mall, pero poner un límite de gasto antes de salir.", consecuenciaHint: "Controlas el impulso sin aislarte." },
-          { id: "opcion_b", texto: "Comprar primero lo necesario y ver cuánto queda para juntarte.", consecuenciaHint: "Priorizas estabilidad, pero puede costar socialmente." }
-        ],
-        concepto: "dinero",
-        ubicacion: "casa",
-        turno: 1,
-        personajes: [
-          { nombre: "Mamá", rol: "familia", estadoEmocional: "atenta" },
-          { nombre: "Tomás", rol: "amigo", estadoEmocional: "entusiasmado" }
-        ],
+        narracion: scenario.narracion,
+        opciones: scenario.opciones,
+        concepto: scenario.concepto,
+        ubicacion: scenario.ubicacion,
+        turno: scenario.turno,
+        personajes: scenario.personajes,
       },
       saludFinanciera: {
         valor: 70,
@@ -478,37 +618,35 @@ function buildLocalGameMaster(input: GameRequest) {
 
   const decision = input.respuestaJugador || "tomar una decisión";
   const economy = computeEconomy(input);
-  const concepto = input.conceptoActual || "presupuesto";
-  const nextTurn = Math.min(10, (input.turno || 1) + 1);
+  const currentTurn = clampNumber(input.turno, 1, 10, 1);
+  const currentScenario = getLocalScenario(currentTurn, edad);
+  const concepto = input.conceptoActual || currentScenario.concepto;
+  const nextTurn = Math.min(10, currentTurn + 1);
+  const nextScenario = currentTurn >= 10 ? null : getLocalScenario(nextTurn, edad);
+  const decisionQuality = economy.objetivoLogrado ? "La decisión te dio aire para el siguiente paso." : "La decisión resolvió algo, pero te dejó menos margen del que parecía.";
 
   return {
-    message: `Elegiste ${decision}. La decisión se nota al tiro: te queda $${economy.saldoNuevo.toLocaleString("es-CL")} y empiezas a mirar el resto de la semana con otros ojos.\n\nNo fue solo mover plata; fue decidir cuánto control querías conservar para lo que viene. La gente alrededor reacciona distinto, pero ahora tienes más claro que cada peso usado deja menos espacio para otra cosa.`,
+    message: `Elegiste ${decision}. Ahora tienes $${economy.saldoNuevo.toLocaleString("es-CL")} disponibles y $${economy.deudasNuevas.toLocaleString("es-CL")} en deuda.\n\n${decisionQuality} Las personas alrededor reaccionan a lo que hiciste, pero lo importante es que ya puedes ver cómo una decisión cambia la siguiente.`,
     conceptoEnsenado: concepto,
     puntos: economy.puntos,
-    escenario: {
-      narracion: `Al día siguiente aparece una nueva presión: hay una actividad con amigos, pero también un gasto chico que no habías considerado. Parece menor, hasta que miras tu saldo.\n\nLa pregunta ya no es si puedes gastar, sino si ese gasto calza con el objetivo que te pusiste.`,
-      opciones: [
-        { id: "opcion_a", texto: "Comparar precios y elegir la opción más barata.", consecuenciaHint: "Cuidas saldo sin cancelar todo." },
-        { id: "opcion_b", texto: "Pagar rápido para no quedar mal con el grupo.", consecuenciaHint: "Mantienes el ritmo social, pero pierdes margen." }
-      ],
-      concepto: "presupuesto",
-      ubicacion: "colegio",
-      turno: nextTurn,
-      personajes: [
-        { nombre: "Tomás", rol: "amigo", estadoEmocional: "apurado" },
-        { nombre: "Mamá", rol: "familia", estadoEmocional: "observadora" }
-      ],
-    },
+    escenario: nextScenario ? {
+      narracion: nextScenario.narracion,
+      opciones: nextScenario.opciones,
+      concepto: nextScenario.concepto,
+      ubicacion: nextScenario.ubicacion,
+      turno: nextScenario.turno,
+      personajes: nextScenario.personajes,
+    } : null,
     saldoNuevo: economy.saldoNuevo,
     deudasNuevas: economy.deudasNuevas,
     relacionesFamiliaNueva: economy.relacionesFamiliaNueva,
     relacionesAmigosNueva: economy.relacionesAmigosNueva,
     saludFinanciera: economy.saludFinanciera,
     pausaEducativa: {
-      concepto: "presupuesto",
-      quienExplica: "Mamá",
-      explicacion: "Presupuesto no es dejar de vivir, es decidir antes para que la plata no decida por ti después. Hoy viste que gastar sin mirar el resto de la semana te deja con menos libertad.",
-      preguntaReflexiva: "¿Qué gasto chico te ha dejado apretado alguna vez?"
+      concepto,
+      quienExplica: currentScenario.personajes[0]?.nombre || "Mamá",
+      explicacion: `${concepto.replace(/_/g, " ")} no es una palabra de prueba: es lo que acabas de vivir. Cuando elegiste, moviste plata, confianza y opciones futuras al mismo tiempo.`,
+      preguntaReflexiva: "¿Qué mirarías antes de tomar una decisión parecida?"
     },
     objetivoActual: buildNextObjective(input, economy),
     objetivoLogrado: economy.objetivoLogrado,
@@ -590,22 +728,25 @@ export async function POST(req: Request) {
   }
 
   const narracion = (gm.narracion as string) || (gm.narración as string) || "";
-  const escSig = gm.escenarioSiguiente as Record<string, unknown> | undefined;
   const economy = input.fase === "evaluar_decision" ? computeEconomy(input) : null;
   const nextObjective = economy ? buildNextObjective(input, economy) : gm.objetivoActual;
+  const nextTurn = Math.min(10, clampNumber(input.turno, 1, 10, 1) + 1);
+  const localNextScenario = economy && clampNumber(input.turno, 1, 10, 1) < 10
+    ? getLocalScenario(nextTurn, input.edad || 13)
+    : null;
 
   return NextResponse.json({
     message: narracion,
     conceptoEnsenado: gm.conceptoEnsenado,
     puntos: economy?.puntos ?? clampNumber(gm.puntos, 0, 100, 0),
-    escenario: {
-      narracion: (escSig?.narracion as string) || (escSig?.narración as string) || narracion,
-      opciones: escSig?.opciones || gm.opciones,
-      concepto: (escSig?.conceptoEnsenado as string) || (gm.conceptoEnsenado as string),
-      ubicacion: (escSig?.ubicacion as string) || (gm.ubicacion as string),
-      turno: escSig?.turno,
-      personajes: escSig?.personajes,
-    },
+    escenario: localNextScenario ? {
+      narracion: localNextScenario.narracion,
+      opciones: localNextScenario.opciones,
+      concepto: localNextScenario.concepto,
+      ubicacion: localNextScenario.ubicacion,
+      turno: localNextScenario.turno,
+      personajes: localNextScenario.personajes,
+    } : null,
     saldoNuevo: economy?.saldoNuevo ?? gm.saldoNuevo,
     deudasNuevas: economy?.deudasNuevas ?? gm.deudasNuevas,
     relacionesFamiliaNueva: economy?.relacionesFamiliaNueva ?? gm.relacionesFamiliaNueva,
