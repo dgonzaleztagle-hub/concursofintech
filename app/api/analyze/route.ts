@@ -156,7 +156,6 @@ NO digas "no hay problemas". El ciudadano REPORTÓ un problema. Tu trabajo es RE
 
     // --- PASO 1: GENERACIÓN (First Pass) ---
     console.info(`[Beeper API] PASO 1: Generando diagnóstico inicial usando ${activeProvider}...`);
-    const genPrompt = `${contextWithFraud}\n\n${inclusionRules}\n\nAnaliza este perfil:\n${JSON.stringify(profile, null, 2)}`;
 
     let initialAnalysis: AnalysisResult;
 
