@@ -30,8 +30,14 @@ function normalizeLLMResponse(raw: Record<string, unknown>): Record<string, unkn
   return normalized;
 }
 
+function cleanProviderKey(value?: string): string {
+  const key = (value || "").trim().replace(/^["']|["']$/g, "");
+  if (!key || /^PEGA_/i.test(key) || /^TODO/i.test(key) || /^REPLACE/i.test(key)) return "";
+  return key;
+}
+
 function getNvidiaApiKey(): string {
-  return process.env.NVIDIA_API_KEY || process.env.NIM_API_KEY || "";
+  return cleanProviderKey(process.env.NVIDIA_API_KEY) || cleanProviderKey(process.env.NIM_API_KEY);
 }
 
 async function callNvidia(systemPrompt: string, userPrompt: string, nvidiaKey: string): Promise<string> {
@@ -65,7 +71,7 @@ async function callNvidia(systemPrompt: string, userPrompt: string, nvidiaKey: s
 }
 
 async function callGroq(systemPrompt: string, userPrompt: string): Promise<string> {
-  const groqKey = process.env.GROQ_API_KEY;
+  const groqKey = cleanProviderKey(process.env.GROQ_API_KEY);
   if (!groqKey) throw new Error("GROQ_API_KEY not set");
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",

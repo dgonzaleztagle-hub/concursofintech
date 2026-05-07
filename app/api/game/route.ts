@@ -1,7 +1,17 @@
 import { NextResponse } from "next/server";
 
-const GROQ_API_KEY = process.env.GROQ_API_KEY;
-const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY || process.env.NIM_API_KEY;
+function cleanProviderKey(value?: string) {
+  const key = (value || "").trim().replace(/^["']|["']$/g, "");
+  if (!key || /^PEGA_/i.test(key) || /^TODO/i.test(key) || /^REPLACE/i.test(key)) return "";
+  return key;
+}
+
+function gameJson(body: unknown, provider: string) {
+  return NextResponse.json(body, { status: 200, headers: { "x-game-provider": provider } });
+}
+
+const GROQ_API_KEY = cleanProviderKey(process.env.GROQ_API_KEY);
+const NVIDIA_API_KEY = cleanProviderKey(process.env.NVIDIA_API_KEY) || cleanProviderKey(process.env.NIM_API_KEY);
 
 const PROVIDERS = [
   {
@@ -661,11 +671,12 @@ export async function POST(req: Request) {
 
   const availableProviders = PROVIDERS.filter(p => p.key());
   if (availableProviders.length === 0) {
-    return NextResponse.json(input.fase === "mentor" ? buildLocalMentor(input) : buildLocalGameMaster(input), { status: 200 });
+    return gameJson(input.fase === "mentor" ? buildLocalMentor(input) : buildLocalGameMaster(input), "local:no-provider-key");
   }
 
   const userPrompt = input.fase === "mentor" ? buildMentorPrompt(input) : buildPrompt(input);
   let content = "";
+  let providerUsed = "local:provider-failed";
 
   for (const provider of availableProviders) {
     try {
@@ -699,6 +710,7 @@ export async function POST(req: Request) {
 
       const data = await response.json();
       content = data.choices?.[0]?.message?.content || "";
+      providerUsed = provider.name;
       console.log(`[GM] responded via ${provider.name}`);
       break;
     } catch (err) {
@@ -708,7 +720,7 @@ export async function POST(req: Request) {
   }
 
   if (!content) {
-    return NextResponse.json(input.fase === "mentor" ? buildLocalMentor(input) : buildLocalGameMaster(input), { status: 200 });
+    return gameJson(input.fase === "mentor" ? buildLocalMentor(input) : buildLocalGameMaster(input), providerUsed);
   }
 
   let gm: Record<string, unknown>;
@@ -717,14 +729,14 @@ export async function POST(req: Request) {
     gm = JSON.parse(jsonStr);
   } catch {
     console.error("JSON parse failed:", content.slice(0, 200));
-    return NextResponse.json(input.fase === "mentor" ? buildLocalMentor(input) : buildLocalGameMaster(input), { status: 200 });
+    return gameJson(input.fase === "mentor" ? buildLocalMentor(input) : buildLocalGameMaster(input), `${providerUsed}:invalid-json`);
   }
 
   if (input.fase === "mentor") {
-    return NextResponse.json({
+    return gameJson({
       answer: typeof gm.answer === "string" ? gm.answer : buildLocalMentor(input).answer,
       suggestions: Array.isArray(gm.suggestions) ? gm.suggestions.slice(0, 3) : buildLocalMentor(input).suggestions,
-    });
+    }, providerUsed);
   }
 
   const narracion = (gm.narracion as string) || (gm.narración as string) || "";
@@ -735,7 +747,7 @@ export async function POST(req: Request) {
     ? getLocalScenario(nextTurn, input.edad || 13)
     : null;
 
-  return NextResponse.json({
+  return gameJson({
     message: narracion,
     conceptoEnsenado: gm.conceptoEnsenado,
     puntos: economy?.puntos ?? clampNumber(gm.puntos, 0, 100, 0),
@@ -758,5 +770,5 @@ export async function POST(req: Request) {
     transicion: gm.transicion,
     proximoConcepto: gm.proximoConcepto,
     consecuencias: gm.consecuencias,
-  });
+  }, providerUsed);
 }
