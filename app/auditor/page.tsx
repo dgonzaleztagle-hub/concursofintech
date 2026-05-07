@@ -84,7 +84,7 @@ export default function AuditorPage() {
 
             <div className="bg-yellow-100 bg-opacity-20 border border-yellow-700 border-opacity-30 rounded-lg p-3 mt-2">
               <div className="text-[8px] font-bold uppercase text-yellow-900 opacity-70 leading-relaxed">
-                ⚠️ DEMOSTRACIÓN: Por ausencia de conexiones reales con bancos o wallets, este segmento demuestra cómo el Legal Brain analiza cualquier caso financiero reportado usando normativa chilena vigente. Los resultados no son hardcodeados, sino generados por IA en tiempo real.
+                ⚠️ DEMOSTRACIÓN EXCLUSIVA PARA JUECES: Por ausencia de conexiones reales con bancos o wallets, este segmento demuestra cómo el Legal Brain analiza cualquier caso financiero reportado usando normativa chilena vigente. Los resultados no son hardcodeados, sino generados por IA en tiempo real. Esta pantalla NO es parte del producto final.
               </div>
             </div>
 
