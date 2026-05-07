@@ -18,8 +18,8 @@ const PROVIDERS = [
     name: "nim",
     url: "https://integrate.api.nvidia.com/v1/chat/completions",
     key: () => NVIDIA_API_KEY,
-    model: "mistralai/mistral-nemotron",
-    supportsJsonMode: false,
+    model: "meta/llama-3.1-8b-instruct",
+    supportsJsonMode: true,
   },
   {
     name: "groq",
@@ -29,6 +29,11 @@ const PROVIDERS = [
     supportsJsonMode: true,
   },
 ];
+
+const GAME_NARRATOR_PROMPT = `Eres el narrador de un juego de supervivencia financiera para jóvenes en Chile.
+Responde solo JSON puro. No recalcules números, puntos, saldo, deuda ni turnos.
+Tu trabajo es narrar la consecuencia de la decisión y explicar el concepto vivido en lenguaje simple.
+Máximo 2 párrafos breves en la narración. La pausa educativa debe tener máximo 3 oraciones.`;
 
 const SYSTEM_PROMPT = `Eres el GAME MASTER de un juego de supervivencia financiera para jóvenes en Chile. Tu trabajo es crear una EXPERIENCIA NARRATIVA donde el jugador vive situaciones reales, toma decisiones financieras, y aprende conceptos a través de las consecuencias — nunca por lecciones directas.
 
@@ -573,6 +578,49 @@ Responde como JSON puro válido:
 }`;
 }
 
+function buildNarrationPrompt(input: GameRequest): string {
+  const edad = input.edad || 13;
+  const currentTurn = clampNumber(input.turno, 1, 10, 1);
+  const currentScenario = getLocalScenario(currentTurn, edad);
+  const nextScenario = currentTurn < 10 ? getLocalScenario(currentTurn + 1, edad) : null;
+  const conceptosAprendidos = input.conceptosAprendidosArray || [];
+
+  return `ESTADO:
+- Edad: ${edad}
+- Turno: ${currentTurn}/10
+- Ubicación: ${currentScenario.ubicacion}
+- Concepto actual: ${input.conceptoActual || currentScenario.concepto}
+- Conceptos ya vistos: ${conceptosAprendidos.join(", ") || "ninguno"}
+- Saldo antes: $${(input.saldoActual ?? 0).toLocaleString("es-CL")}
+- Deuda antes: $${(input.deudasActuales ?? 0).toLocaleString("es-CL")}
+- Familia: ${input.relacionesFamilia ?? 75}/100
+- Amigos: ${input.relacionesAmigos ?? 70}/100
+
+ESCENA:
+${currentScenario.narracion}
+
+DECISIÓN DEL JUGADOR:
+"${input.respuestaJugador || "tomar una decisión"}"
+
+SIGUIENTE ESCENA PLANIFICADA:
+${nextScenario ? `${nextScenario.concepto}: ${nextScenario.narracion}` : "cierre de partida"}
+
+Devuelve este JSON:
+{
+  "narracion": "consecuencia emocional y concreta de la decisión, sin números inventados",
+  "conceptoEnsenado": "${input.conceptoActual || currentScenario.concepto}",
+  "pausaEducativa": {
+    "concepto": "${input.conceptoActual || currentScenario.concepto}",
+    "quienExplica": "${currentScenario.personajes[0]?.nombre || "Mamá"}",
+    "explicacion": "explicación simple usando la decisión del jugador",
+    "preguntaReflexiva": "pregunta breve sobre la decisión"
+  },
+  "consecuencias": "resumen breve",
+  "transicion": "frase breve hacia lo que viene",
+  "proximoConcepto": "${nextScenario?.concepto || "cierre"}"
+}`;
+}
+
 function buildLocalMentor(input: GameRequest) {
   const conceptos = input.conceptosAprendidosArray || [];
   const deuda = input.deudasActuales ?? 0;
@@ -669,12 +717,25 @@ function buildLocalGameMaster(input: GameRequest) {
 export async function POST(req: Request) {
   const input: GameRequest = await req.json();
 
+  if (input.fase === "init") {
+    return gameJson(buildLocalGameMaster(input), "local:init");
+  }
+
   const availableProviders = PROVIDERS.filter(p => p.key());
   if (availableProviders.length === 0) {
     return gameJson(input.fase === "mentor" ? buildLocalMentor(input) : buildLocalGameMaster(input), "local:no-provider-key");
   }
 
-  const userPrompt = input.fase === "mentor" ? buildMentorPrompt(input) : buildPrompt(input);
+  const userPrompt = input.fase === "mentor"
+    ? buildMentorPrompt(input)
+    : input.fase === "evaluar_decision"
+      ? buildNarrationPrompt(input)
+      : buildPrompt(input);
+  const systemPrompt = input.fase === "mentor"
+    ? "Responde como mentor financiero en JSON puro válido."
+    : input.fase === "evaluar_decision"
+      ? GAME_NARRATOR_PROMPT
+      : SYSTEM_PROMPT;
   let content = "";
   let providerUsed = "local:provider-failed";
 
@@ -683,11 +744,11 @@ export async function POST(req: Request) {
       const body: Record<string, unknown> = {
         model: provider.model,
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
+          { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
         temperature: 0.75,
-        max_tokens: 3500,
+        max_tokens: input.fase === "mentor" ? 600 : 900,
       };
       if (provider.supportsJsonMode) {
         body.response_format = { type: "json_object" };

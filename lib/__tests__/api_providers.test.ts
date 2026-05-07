@@ -8,7 +8,7 @@ const getProviderChoice = (
   groqKey: string,
   googleKey: string
 ) => {
-  if (nvidiaKey || nimKey) return "NVIDIA Llama-3.1-405B";
+  if (nvidiaKey || nimKey) return "NVIDIA NIM";
   if (anthropicKey) return "Claude 3.5 Sonnet";
   if (groqKey) return "Groq llama-3.3-70b";
   if (googleKey) return "Gemini 1.5 Flash";
@@ -18,12 +18,12 @@ const getProviderChoice = (
 describe("Multi-Provider API Logic", () => {
   it("debería elegir NVIDIA como proveedor maestro si hay NVIDIA_API_KEY", () => {
     const choice = getProviderChoice("nvapi-valid", "", "sk-ant-api03-valid", "gsk-valid", "AIzaSy-valid");
-    expect(choice).toBe("NVIDIA Llama-3.1-405B");
+    expect(choice).toBe("NVIDIA NIM");
   });
 
   it("debería elegir NVIDIA como proveedor maestro si hay NIM_API_KEY", () => {
     const choice = getProviderChoice("", "nvapi-valid", "sk-ant-api03-valid", "gsk-valid", "AIzaSy-valid");
-    expect(choice).toBe("NVIDIA Llama-3.1-405B");
+    expect(choice).toBe("NVIDIA NIM");
   });
 
   it("debería hacer fallback a Claude, Groq y Gemini en ese orden", () => {

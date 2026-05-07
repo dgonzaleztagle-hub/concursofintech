@@ -50,11 +50,12 @@ async function callNvidia(systemPrompt: string, userPrompt: string, nvidiaKey: s
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "nvidia/llama-3.1-405b-instruct",
+      model: "meta/llama-3.3-70b-instruct",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
+      response_format: { type: "json_object" },
       temperature: 0.3,
       max_tokens: 2000,
       top_p: 0.7,
