@@ -211,6 +211,78 @@ function getSecuenciaConceptos(edad: number): string[] {
   return [...n1, ...n2, ...n3];
 }
 
+function clampNumber(value: unknown, min: number, max: number, fallback: number): number {
+  const n = typeof value === "number" && Number.isFinite(value) ? value : fallback;
+  return Math.max(min, Math.min(max, Math.round(n)));
+}
+
+function inferDecisionProfile(decision: string) {
+  const lower = decision.toLowerCase();
+  const responsible = /l[ií]mite|necesario|guardar|ahorrar|comparar|presupuesto|primero|barata|barato|esperar|cotizar/.test(lower);
+  const debtRisk = /pedir|prestado|cuotas|cr[eé]dito|tarjeta|deuda|fiado/.test(lower);
+  const socialSpend = /mall|salir|amigos|grupo|invitar|videojuego|marca|r[aá]pido/.test(lower);
+  const familyCare = /mam[aá]|pap[aá]|hermana|familia|casa|ayudar/.test(lower);
+  return { responsible, debtRisk, socialSpend, familyCare };
+}
+
+function computeEconomy(input: GameRequest) {
+  const turn = clampNumber(input.turno, 1, 10, 1);
+  const saldo = clampNumber(input.saldoActual, 0, 300000, input.edad && input.edad <= 12 ? 50000 : 100000);
+  const deudas = clampNumber(input.deudasActuales, 0, 500000, 0);
+  const familia = clampNumber(input.relacionesFamilia, 0, 100, 75);
+  const amigos = clampNumber(input.relacionesAmigos, 0, 100, 70);
+  const profile = inferDecisionProfile(input.respuestaJugador || "");
+
+  const baseCost = 6000 + turn * 2500;
+  const cost = profile.responsible
+    ? Math.min(saldo, Math.max(4000, Math.round(baseCost * 0.65)))
+    : Math.round(baseCost * (profile.socialSpend ? 1.9 : 1.35));
+  const uncovered = Math.max(0, cost - saldo);
+  const saldoNuevo = Math.max(0, saldo - cost);
+  const deudasNuevas = deudas + (profile.debtRisk ? Math.max(15000, uncovered) : uncovered > 0 ? Math.min(20000, uncovered) : 0);
+  const relacionesFamiliaNueva = clampNumber(
+    familia + (profile.familyCare ? 6 : profile.responsible ? 3 : -4),
+    0,
+    100,
+    familia
+  );
+  const relacionesAmigosNueva = clampNumber(
+    amigos + (profile.socialSpend ? 5 : profile.responsible ? -1 : -3),
+    0,
+    100,
+    amigos
+  );
+  const cashScore = Math.min(35, saldoNuevo / 3000);
+  const debtPenalty = Math.min(35, deudasNuevas / 6000);
+  const relationScore = ((relacionesFamiliaNueva + relacionesAmigosNueva) / 2) * 0.35;
+  const saludValor = clampNumber(30 + cashScore + relationScore - debtPenalty, 0, 100, 60);
+  const requiredSaldo = Math.max(10000, Math.round(saldo * 0.25));
+  const lowCashPenalty = saldoNuevo < requiredSaldo ? 20 : 0;
+  const debtPressurePenalty = deudasNuevas > Math.max(0, saldoNuevo) ? 10 : 0;
+  const puntos = clampNumber(
+    (profile.responsible ? 78 : 45) - uncovered / 1000 - lowCashPenalty - debtPressurePenalty,
+    0,
+    100,
+    40
+  );
+  const objetivoLogrado = profile.responsible && deudasNuevas <= deudas && saldoNuevo >= requiredSaldo;
+  const alerta = saldoNuevo < 20000
+    ? "Saldo bajo: conviene cuidar cada gasto."
+    : deudasNuevas > saldoNuevo * 2 && deudasNuevas > 0
+      ? "Deuda alta frente al saldo disponible."
+      : null;
+
+  return {
+    puntos,
+    saldoNuevo,
+    deudasNuevas,
+    relacionesFamiliaNueva,
+    relacionesAmigosNueva,
+    saludFinanciera: { valor: saludValor, alerta },
+    objetivoLogrado,
+  };
+}
+
 function buildPrompt(input: GameRequest): string {
   const edad = input.edad || 13;
   const edadGroup = edad <= 12 ? "10-12" : edad <= 13 ? "12-13" : "14-16";
@@ -300,10 +372,6 @@ Responde como JSON puro válido. Sin markdown.`;
 
 function buildLocalGameMaster(input: GameRequest) {
   const edad = input.edad || 13;
-  const saldo = input.saldoActual ?? (edad <= 12 ? 50000 : 100000);
-  const deudas = input.deudasActuales ?? 0;
-  const familia = input.relacionesFamilia ?? 75;
-  const amigos = input.relacionesAmigos ?? 70;
 
   if (input.fase === "init") {
     const initialSaldo = edad <= 12 ? 50000 : 120000;
@@ -342,23 +410,14 @@ function buildLocalGameMaster(input: GameRequest) {
   }
 
   const decision = input.respuestaJugador || "tomar una decisión";
-  const lower = decision.toLowerCase();
-  const responsible = /l[ií]mite|necesario|guardar|ahorrar|comparar|presupuesto|primero/.test(lower);
-  const spend = /mall|comprar|salir|gastar|invitar|pedir/.test(lower);
-  const deltaSaldo = responsible ? -12000 : spend ? -32000 : -18000;
-  const saldoNuevo = Math.max(0, saldo + deltaSaldo);
-  const deudasNuevas = deudas + (responsible ? 0 : saldoNuevo < 20000 ? 15000 : 0);
-  const relacionesFamiliaNueva = Math.max(0, Math.min(100, familia + (responsible ? 4 : -4)));
-  const relacionesAmigosNueva = Math.max(0, Math.min(100, amigos + (spend ? 4 : -1)));
-  const saludValor = Math.max(0, Math.min(100, Math.round(70 + saldoNuevo / 5000 - deudasNuevas / 6000 + (relacionesFamiliaNueva - 75) / 3)));
-  const puntos = responsible ? 75 : 40;
+  const economy = computeEconomy(input);
   const concepto = input.conceptoActual || "presupuesto";
-  const nextTurn = (input.turno || 1) + 1;
+  const nextTurn = Math.min(10, (input.turno || 1) + 1);
 
   return {
-    message: `Elegiste ${decision}. La decisión se nota al tiro: te queda $${saldoNuevo.toLocaleString("es-CL")} y empiezas a mirar el resto de la semana con otros ojos.\n\nNo fue solo mover plata; fue decidir cuánto control querías conservar para lo que viene. La gente alrededor reacciona distinto, pero ahora tienes más claro que cada peso usado deja menos espacio para otra cosa.`,
+    message: `Elegiste ${decision}. La decisión se nota al tiro: te queda $${economy.saldoNuevo.toLocaleString("es-CL")} y empiezas a mirar el resto de la semana con otros ojos.\n\nNo fue solo mover plata; fue decidir cuánto control querías conservar para lo que viene. La gente alrededor reacciona distinto, pero ahora tienes más claro que cada peso usado deja menos espacio para otra cosa.`,
     conceptoEnsenado: concepto,
-    puntos,
+    puntos: economy.puntos,
     escenario: {
       narracion: `Al día siguiente aparece una nueva presión: hay una actividad con amigos, pero también un gasto chico que no habías considerado. Parece menor, hasta que miras tu saldo.\n\nLa pregunta ya no es si puedes gastar, sino si ese gasto calza con el objetivo que te pusiste.`,
       opciones: [
@@ -373,14 +432,11 @@ function buildLocalGameMaster(input: GameRequest) {
         { nombre: "Mamá", rol: "familia", estadoEmocional: "observadora" }
       ],
     },
-    saldoNuevo,
-    deudasNuevas,
-    relacionesFamiliaNueva,
-    relacionesAmigosNueva,
-    saludFinanciera: {
-      valor: saludValor,
-      alerta: saldoNuevo < 20000 ? "Saldo bajo: conviene cuidar cada gasto." : null
-    },
+    saldoNuevo: economy.saldoNuevo,
+    deudasNuevas: economy.deudasNuevas,
+    relacionesFamiliaNueva: economy.relacionesFamiliaNueva,
+    relacionesAmigosNueva: economy.relacionesAmigosNueva,
+    saludFinanciera: economy.saludFinanciera,
     pausaEducativa: {
       concepto: "presupuesto",
       quienExplica: "Mamá",
@@ -388,11 +444,11 @@ function buildLocalGameMaster(input: GameRequest) {
       preguntaReflexiva: "¿Qué gasto chico te ha dejado apretado alguna vez?"
     },
     objetivoActual: {
-      descripcion: `Llega al turno ${nextTurn} sin crear nueva deuda y con al menos $${Math.max(10000, Math.round(saldoNuevo * 0.6)).toLocaleString("es-CL")}.`,
+      descripcion: `Llega al turno ${nextTurn} sin crear nueva deuda y con al menos $${Math.max(10000, Math.round(economy.saldoNuevo * 0.6)).toLocaleString("es-CL")}.`,
       recompensa: "Puedes resolver el siguiente problema sin pedir ayuda.",
       consecuenciaSiFalla: "Tendrás que elegir entre deuda o cancelar algo importante."
     },
-    objetivoLogrado: responsible,
+    objetivoLogrado: economy.objetivoLogrado,
     transicion: "La semana sigue y la presión cambia de forma.",
     proximoConcepto: "presupuesto",
     consecuencias: "La decisión impactó tu saldo y tu margen para el siguiente turno."
@@ -465,11 +521,12 @@ export async function POST(req: Request) {
 
   const narracion = (gm.narracion as string) || (gm.narración as string) || "";
   const escSig = gm.escenarioSiguiente as Record<string, unknown> | undefined;
+  const economy = input.fase === "evaluar_decision" ? computeEconomy(input) : null;
 
   return NextResponse.json({
     message: narracion,
     conceptoEnsenado: gm.conceptoEnsenado,
-    puntos: gm.puntos,
+    puntos: economy?.puntos ?? clampNumber(gm.puntos, 0, 100, 0),
     escenario: {
       narracion: (escSig?.narracion as string) || (escSig?.narración as string) || narracion,
       opciones: escSig?.opciones || gm.opciones,
@@ -478,14 +535,14 @@ export async function POST(req: Request) {
       turno: escSig?.turno,
       personajes: escSig?.personajes,
     },
-    saldoNuevo: gm.saldoNuevo,
-    deudasNuevas: gm.deudasNuevas,
-    relacionesFamiliaNueva: gm.relacionesFamiliaNueva,
-    relacionesAmigosNueva: gm.relacionesAmigosNueva,
-    saludFinanciera: gm.saludFinancieraNueva || gm.saludFinanciera,
+    saldoNuevo: economy?.saldoNuevo ?? gm.saldoNuevo,
+    deudasNuevas: economy?.deudasNuevas ?? gm.deudasNuevas,
+    relacionesFamiliaNueva: economy?.relacionesFamiliaNueva ?? gm.relacionesFamiliaNueva,
+    relacionesAmigosNueva: economy?.relacionesAmigosNueva ?? gm.relacionesAmigosNueva,
+    saludFinanciera: economy?.saludFinanciera ?? gm.saludFinancieraNueva ?? gm.saludFinanciera,
     pausaEducativa: gm.pausaEducativa,
     objetivoActual: gm.objetivoActual,
-    objetivoLogrado: gm.objetivoLogrado,
+    objetivoLogrado: economy?.objetivoLogrado ?? gm.objetivoLogrado,
     transicion: gm.transicion,
     proximoConcepto: gm.proximoConcepto,
     consecuencias: gm.consecuencias,

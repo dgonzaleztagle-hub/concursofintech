@@ -76,6 +76,11 @@ function assertGameResponse(res: Response, data: { message?: string }) {
   }
 }
 
+function clampStat(value: unknown, min: number, max: number, fallback: number) {
+  const n = typeof value === "number" && Number.isFinite(value) ? value : fallback;
+  return Math.max(min, Math.min(max, Math.round(n)));
+}
+
 function saludColor(v: number) {
   if (v >= 60) return "#1a2f1a";
   if (v >= 35) return "#7a5c00";
@@ -273,9 +278,9 @@ export default function AprendePage() {
         edad,
         turno: 1,
         saldo: (data.saludFinanciera?.saldo) ?? (edad <= 12 ? 50000 : 100000),
-        deudas: 0,
-        relacionesFamilia: 75,
-        relacionesAmigos: 70,
+        deudas: clampStat(data.saludFinanciera?.deudas, 0, 500000, 0),
+        relacionesFamilia: clampStat(data.saludFinanciera?.relacionesFamilia, 0, 100, 75),
+        relacionesAmigos: clampStat(data.saludFinanciera?.relacionesAmigos, 0, 100, 70),
         puntuacionTotal: 0,
         conceptosAprendidos: [],
         decisiones: [],
@@ -320,9 +325,9 @@ export default function AprendePage() {
       const data = await res.json();
       assertGameResponse(res, data);
 
-      const puntos = data.puntos ?? 40;
-      const saldoNuevo = data.saldoNuevo ?? gameState.saldo;
-      const deudasNuevas = data.deudasNuevas ?? gameState.deudas;
+      const puntos = clampStat(data.puntos, 0, 100, 40);
+      const saldoNuevo = clampStat(data.saldoNuevo, 0, 300000, gameState.saldo);
+      const deudasNuevas = clampStat(data.deudasNuevas, 0, 500000, gameState.deudas);
       const familiaNew = Math.max(0, Math.min(100, data.relacionesFamiliaNueva ?? gameState.relacionesFamilia));
       const amigosNew = Math.max(0, Math.min(100, data.relacionesAmigosNueva ?? gameState.relacionesAmigos));
       const conceptoId = typeof data.conceptoEnsenado === "string"
@@ -331,7 +336,7 @@ export default function AprendePage() {
 
       setGameState(prev => prev ? {
         ...prev,
-        turno: prev.turno + 1,
+        turno: Math.min(10, prev.turno + 1),
         puntuacionTotal: prev.puntuacionTotal + puntos,
         saldo: saldoNuevo,
         deudas: deudasNuevas,
@@ -370,7 +375,11 @@ export default function AprendePage() {
   // ── siguiente ──────────────────────────────────────────────────────────────
   const handleSiguiente = () => {
     if (!gameState) return;
-    if (gameState.turno > 10 || (gameState.saldo <= 0 && gameState.deudas > 200000 && gameState.relacionesFamilia < 20)) {
+    if (
+      (feedback && gameState.turno >= 10) ||
+      gameState.turno > 10 ||
+      (gameState.saldo <= 0 && gameState.deudas > 200000 && gameState.relacionesFamilia < 20)
+    ) {
       setFeedback(null);
       setPhase("finished");
       return;
