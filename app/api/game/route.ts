@@ -285,6 +285,17 @@ function computeEconomy(input: GameRequest) {
   };
 }
 
+function buildNextObjective(input: GameRequest, economy: ReturnType<typeof computeEconomy>) {
+  const turn = clampNumber(input.turno, 1, 10, 1);
+  if (turn >= 10) return null;
+
+  return {
+    descripcion: `En el próximo turno, evita nueva deuda y conserva al menos $${Math.max(10000, Math.round(economy.saldoNuevo * 0.6)).toLocaleString("es-CL")}.`,
+    recompensa: "Puedes resolver el siguiente problema con más margen.",
+    consecuenciaSiFalla: "Tendrás menos espacio para elegir sin pedir ayuda."
+  };
+}
+
 function buildPrompt(input: GameRequest): string {
   const edad = input.edad || 13;
   const edadGroup = edad <= 12 ? "10-12" : edad <= 13 ? "12-13" : "14-16";
@@ -499,11 +510,7 @@ function buildLocalGameMaster(input: GameRequest) {
       explicacion: "Presupuesto no es dejar de vivir, es decidir antes para que la plata no decida por ti después. Hoy viste que gastar sin mirar el resto de la semana te deja con menos libertad.",
       preguntaReflexiva: "¿Qué gasto chico te ha dejado apretado alguna vez?"
     },
-    objetivoActual: {
-      descripcion: `Llega al turno ${nextTurn} sin crear nueva deuda y con al menos $${Math.max(10000, Math.round(economy.saldoNuevo * 0.6)).toLocaleString("es-CL")}.`,
-      recompensa: "Puedes resolver el siguiente problema sin pedir ayuda.",
-      consecuenciaSiFalla: "Tendrás que elegir entre deuda o cancelar algo importante."
-    },
+    objetivoActual: buildNextObjective(input, economy),
     objetivoLogrado: economy.objetivoLogrado,
     transicion: "La semana sigue y la presión cambia de forma.",
     proximoConcepto: "presupuesto",
@@ -585,6 +592,7 @@ export async function POST(req: Request) {
   const narracion = (gm.narracion as string) || (gm.narración as string) || "";
   const escSig = gm.escenarioSiguiente as Record<string, unknown> | undefined;
   const economy = input.fase === "evaluar_decision" ? computeEconomy(input) : null;
+  const nextObjective = economy ? buildNextObjective(input, economy) : gm.objetivoActual;
 
   return NextResponse.json({
     message: narracion,
@@ -604,7 +612,7 @@ export async function POST(req: Request) {
     relacionesAmigosNueva: economy?.relacionesAmigosNueva ?? gm.relacionesAmigosNueva,
     saludFinanciera: economy?.saludFinanciera ?? gm.saludFinancieraNueva ?? gm.saludFinanciera,
     pausaEducativa: gm.pausaEducativa,
-    objetivoActual: gm.objetivoActual,
+    objetivoActual: nextObjective,
     objetivoLogrado: economy?.objetivoLogrado ?? gm.objetivoLogrado,
     transicion: gm.transicion,
     proximoConcepto: gm.proximoConcepto,

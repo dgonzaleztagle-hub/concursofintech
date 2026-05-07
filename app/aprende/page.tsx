@@ -441,7 +441,7 @@ export default function AprendePage() {
         puntuacionTotal: 0,
         conceptosAprendidos: [],
         decisiones: [],
-        objetivoActual: data.objetivoActual,
+        objetivoActual: data.objetivoActual || undefined,
       });
       setSalud(data.saludFinanciera || { valor: 70, alerta: null });
       setCurrentScenario(primerEscenario);
@@ -508,7 +508,7 @@ export default function AprendePage() {
           conceptoIdentificado: conceptoId,
           puntos,
         }],
-        objetivoActual: data.objetivoActual,
+        objetivoActual: data.objetivoActual || undefined,
       } : prev);
 
       if (data.saludFinanciera) setSalud(data.saludFinanciera);
@@ -517,7 +517,7 @@ export default function AprendePage() {
         message: data.message,
         puntos,
         pausa: data.pausaEducativa,
-        objetivo: data.objetivoActual,
+        objetivo: data.objetivoActual || undefined,
         objetivoLogrado: data.objetivoLogrado,
         nextScenario: data.escenario || undefined,
         nextSalud: data.saludFinanciera,
@@ -535,7 +535,7 @@ export default function AprendePage() {
   const handleSiguiente = () => {
     if (!gameState) return;
     if (
-      (feedback && gameState.turno >= 10) ||
+      (feedback && gameState.decisiones.length >= 10) ||
       gameState.turno > 10 ||
       (gameState.saldo <= 0 && gameState.deudas > 200000 && gameState.relacionesFamilia < 20)
     ) {
@@ -755,7 +755,7 @@ export default function AprendePage() {
                 className="modern-button w-full disabled:opacity-50"
                 style={{ fontSize: "13px" }}
               >
-                {loading ? "Cargando..." : "Continuar →"}
+                {loading ? "Cargando..." : gameState.decisiones.length >= 10 ? "Ver resumen →" : "Continuar →"}
               </button>
             ) : loading ? (
               <div className="text-center text-[11px] font-bold animate-pulse py-3" style={{ color: "var(--lcd-dark)", opacity: 0.6 }}>
