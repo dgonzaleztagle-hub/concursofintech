@@ -29,6 +29,37 @@ function normalizeLLMResponse(raw: Record<string, unknown>): Record<string, unkn
   return normalized;
 }
 
+async function callNvdia(systemPrompt: string, userPrompt: string): Promise<string> {
+  const nvidiaKey = process.env.NVIDIA_API_KEY;
+  if (!nvidiaKey) throw new Error("NVIDIA_API_KEY not set");
+
+  const res = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${nvidiaKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "nvidia/llama-3.1-405b-instruct",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      temperature: 0.3,
+      max_tokens: 2000,
+      top_p: 0.7,
+    }),
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`NVIDIA error ${res.status}: ${errorText}`);
+  }
+
+  const data = await res.json();
+  return data.choices[0].message.content as string;
+}
+
 async function callGroq(systemPrompt: string, userPrompt: string): Promise<string> {
   const groqKey = process.env.GROQ_API_KEY;
   if (!groqKey) throw new Error("GROQ_API_KEY not set");
@@ -52,11 +83,12 @@ async function callGroq(systemPrompt: string, userPrompt: string): Promise<strin
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  const googleKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY || "";
+  const nvidiaKey = process.env.NVIDIA_API_KEY || "";
   const anthropicKey = process.env.ANTHROPIC_API_KEY || "";
   const groqKey = process.env.GROQ_API_KEY || "";
+  const googleKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY || "";
 
-  const activeProvider = anthropicKey ? "Anthropic" : groqKey ? "Groq" : googleKey ? "Gemini" : "offline";
+  const activeProvider = nvidiaKey ? "NVIDIA" : anthropicKey ? "Anthropic" : groqKey ? "Groq" : googleKey ? "Gemini" : "offline";
   console.info(`[Beeper API] Provider detectado: ${activeProvider}`);
 
   const anthropic = anthropicKey ? new Anthropic({ apiKey: anthropicKey }) : null;
@@ -123,16 +155,23 @@ NO digas "no hay problemas". El ciudadano REPORTÓ un problema. Tu trabajo es RE
     }
 
     // --- PASO 1: GENERACIÓN (First Pass) ---
-    console.info(`[Beeper API] PASO 1: Generando diagnóstico inicial usando ${anthropic ? "Claude" : "Gemini"}...`);
+    console.info(`[Beeper API] PASO 1: Generando diagnóstico inicial usando ${activeProvider}...`);
     const genPrompt = `${contextWithFraud}\n\n${inclusionRules}\n\nAnaliza este perfil:\n${JSON.stringify(profile, null, 2)}`;
-    
+
     let initialAnalysis: AnalysisResult;
 
-    if (anthropic) {
-      const userMessage = problemaReportado
-        ? `PROBLEMA REPORTADO: "${problemaReportado}"\n\nBasándote en SOLO el problema reportado y la normativa chilena, proporciona análisis, leyes aplicables, y acciones concretas. NO digas "no hay problemas".\n\nPerfil contextual:\n${JSON.stringify(profile, null, 2)}`
-        : `Analiza este perfil financiero y devuelve un JSON según las reglas:\n${JSON.stringify(profile, null, 2)}`;
+    const userMessage = problemaReportado
+      ? `PROBLEMA REPORTADO: "${problemaReportado}"\n\nBasándote en SOLO el problema reportado y la normativa chilena, proporciona análisis, leyes aplicables, y acciones concretas. NO digas "no hay problemas".\n\nPerfil contextual:\n${JSON.stringify(profile, null, 2)}`
+      : `Analiza este perfil financiero y devuelve un JSON según las reglas:\n${JSON.stringify(profile, null, 2)}`;
 
+    if (nvidiaKey) {
+      console.info("[Beeper API] Usando NVIDIA llama-3.1-405b-instruct...");
+      const text = await callNvdia(contextWithFraud, userMessage);
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error("NVIDIA no devolvió JSON válido");
+      initialAnalysis = JSON.parse(jsonMatch[0]);
+    } else if (anthropic) {
+      console.info("[Beeper API] Fallback a Anthropic Claude...");
       const msg = await anthropic.messages.create({
         model: "claude-3-5-sonnet-20240620",
         max_tokens: 2000,
@@ -142,30 +181,24 @@ NO digas "no hay problemas". El ciudadano REPORTÓ un problema. Tu trabajo es RE
       const text = (msg.content[0] as { text: string }).text;
       initialAnalysis = JSON.parse(text.substring(text.indexOf("{"), text.lastIndexOf("}") + 1));
     } else if (groqKey) {
-      const groqUserMessage = problemaReportado
-        ? `PROBLEMA REPORTADO: "${problemaReportado}"\n\nBasándote en SOLO el problema reportado y la normativa chilena, proporciona análisis, leyes aplicables, y acciones concretas. NO digas "no hay problemas".\n\nPerfil contextual:\n${JSON.stringify(profile, null, 2)}`
-        : `Analiza este perfil financiero y devuelve un JSON según las reglas:\n${JSON.stringify(profile, null, 2)}`;
-
-      const text = await callGroq(
-        contextWithFraud,
-        groqUserMessage
-      );
+      console.info("[Beeper API] Fallback a Groq...");
+      const text = await callGroq(contextWithFraud, userMessage);
       initialAnalysis = JSON.parse(text);
     } else if (modelGeneratorGemini) {
-      const geminiPrompt = problemaReportado
-        ? `${contextWithFraud}\n\n${inclusionRules}\n\nPROBLEMA REPORTADO: "${problemaReportado}"\n\nBasándote en SOLO el problema reportado y la normativa chilena, proporciona análisis, leyes aplicables, y acciones concretas. NO digas "no hay problemas".\n\nPerfil contextual:\n${JSON.stringify(profile, null, 2)}`
-        : genPrompt;
-
+      console.info("[Beeper API] Fallback a Gemini...");
+      const geminiPrompt = `${contextWithFraud}\n\n${inclusionRules}\n\n${userMessage}`;
       const genResult = await modelGeneratorGemini.generateContent(geminiPrompt);
       initialAnalysis = JSON.parse(genResult.response.text());
     } else {
       throw new Error("No hay proveedores de IA disponibles");
     }
 
-    // --- PASO 2: AUDITORÍA (Double-Pass — solo para Anthropic/Gemini, Groq ya es preciso) ---
+    // --- PASO 2: AUDITORÍA (Double-Pass — solo para Anthropic/Gemini, NVIDIA/Groq ya son precisos) ---
     let auditedJson: Record<string, unknown> = initialAnalysis as unknown as Record<string, unknown>;
 
-    if (anthropic) {
+    if (nvidiaKey || groqKey) {
+      console.info("[Beeper API] PASO 2: NVIDIA/Groq son suficientemente precisos, omitiendo double-pass.");
+    } else if (anthropic) {
       console.info("[Beeper API] PASO 2: Ejecutando Auditoría Regulatoria (Claude)...");
       const auditPrompt = `
         ERES UN AUDITOR LEGAL FINANCIERO SENIOR.
@@ -225,8 +258,8 @@ NO digas "no hay problemas". El ciudadano REPORTÓ un problema. Tu trabajo es RE
       ...finalData,
       uf_valor_usado: valorUF,
       timestamp: new Date().toISOString(),
-      version: "2.5-multi-provider",
-      provider: anthropic ? "Claude 3.5 Sonnet" : groqKey ? "Groq llama-3.3-70b" : "Gemini 1.5 Flash"
+      version: "2.6-nvidia-primary",
+      provider: nvidiaKey ? "NVIDIA Llama-3.1-405B" : anthropic ? "Claude 3.5 Sonnet" : groqKey ? "Groq llama-3.3-70b" : "Gemini 1.5 Flash"
     };
 
     return NextResponse.json(response, { status: 200 });
@@ -363,7 +396,7 @@ NO digas "no hay problemas". El ciudadano REPORTÓ un problema. Tu trabajo es RE
       ...dynamicResult,
       uf_valor_usado: valorUF,
       timestamp: new Date().toISOString(),
-      provider: "Motor Local"
+      provider: `Motor Local (${activeProvider} falló, usando fallback)`
     }, { status: 200 });
   }
 }
