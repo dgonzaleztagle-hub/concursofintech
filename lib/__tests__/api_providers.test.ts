@@ -1,25 +1,39 @@
 import { describe, it, expect } from "vitest";
 
 // Simulación de la lógica de decisión del provider en route.ts
-const getProviderChoice = (anthropicKey: string, googleKey: string) => {
-  if (anthropicKey && anthropicKey !== "sk-ant-xxx") return "Claude 3.5 Sonnet";
-  if (googleKey && googleKey !== "AIzaSy-xxx") return "Gemini 1.5 Flash";
+const getProviderChoice = (
+  nvidiaKey: string,
+  nimKey: string,
+  anthropicKey: string,
+  groqKey: string,
+  googleKey: string
+) => {
+  if (nvidiaKey || nimKey) return "NVIDIA Llama-3.1-405B";
+  if (anthropicKey) return "Claude 3.5 Sonnet";
+  if (groqKey) return "Groq llama-3.3-70b";
+  if (googleKey) return "Gemini 1.5 Flash";
   return "Motor de Resiliencia";
 };
 
 describe("Multi-Provider API Logic", () => {
-  it("debería elegir Claude como primario si la clave es válida", () => {
-    const choice = getProviderChoice("sk-ant-api03-valid", "AIzaSy-valid");
-    expect(choice).toBe("Claude 3.5 Sonnet");
+  it("debería elegir NVIDIA como proveedor maestro si hay NVIDIA_API_KEY", () => {
+    const choice = getProviderChoice("nvapi-valid", "", "sk-ant-api03-valid", "gsk-valid", "AIzaSy-valid");
+    expect(choice).toBe("NVIDIA Llama-3.1-405B");
   });
 
-  it("debería hacer fallback a Gemini si Claude no tiene clave válida", () => {
-    const choice = getProviderChoice("sk-ant-xxx", "AIzaSy-valid");
-    expect(choice).toBe("Gemini 1.5 Flash");
+  it("debería elegir NVIDIA como proveedor maestro si hay NIM_API_KEY", () => {
+    const choice = getProviderChoice("", "nvapi-valid", "sk-ant-api03-valid", "gsk-valid", "AIzaSy-valid");
+    expect(choice).toBe("NVIDIA Llama-3.1-405B");
+  });
+
+  it("debería hacer fallback a Claude, Groq y Gemini en ese orden", () => {
+    expect(getProviderChoice("", "", "sk-ant-api03-valid", "gsk-valid", "AIzaSy-valid")).toBe("Claude 3.5 Sonnet");
+    expect(getProviderChoice("", "", "", "gsk-valid", "AIzaSy-valid")).toBe("Groq llama-3.3-70b");
+    expect(getProviderChoice("", "", "", "", "AIzaSy-valid")).toBe("Gemini 1.5 Flash");
   });
 
   it("debería usar el Motor de Resiliencia si no hay claves configuradas", () => {
-    const choice = getProviderChoice("", "");
+    const choice = getProviderChoice("", "", "", "", "");
     expect(choice).toBe("Motor de Resiliencia");
   });
 });

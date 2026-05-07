@@ -10,13 +10,13 @@ export function LoadingBeeper() {
   const [step, setStep] = useState(0);
 
   const steps = [
-    "Iniciando Conexión Segura...",
-    "Consultando CMF (Comisión Mercado Financiero)...",
+    "Leyendo señal prioritaria...",
+    "Cruzando banco / wallet / cartola...",
     "Sincronizando Valores UF (Banco Central)...",
-    "Cruzando Datos con Ley 19.496...",
-    "Buscando Seguros Duplicados...",
-    "Detectando Ventas Atadas...",
-    "Generando Reporte de Ahorro...",
+    "Consultando Legal Brain...",
+    "Clasificando derechos del consumidor financiero...",
+    "Detectando cobros, seguros y consentimiento...",
+    "Preparando ruta de acción...",
     "Finalizando Auditoría Pro..."
   ];
 

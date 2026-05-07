@@ -86,6 +86,17 @@ export function AlertCard({ result, onReset }: AlertCardProps) {
         </div>
       </div>
 
+      <div className="mt-1 p-3 rounded-xl border-2 border-[#1a2f1a] border-opacity-20 bg-white bg-opacity-15">
+        <div className="lcd-label mb-1">CURSO DE ACCIÓN:</div>
+        <div className="text-[12px] leading-relaxed font-bold">
+          {result.accion}
+        </div>
+      </div>
+
+      <div className="text-[10px] leading-relaxed font-black opacity-60 uppercase">
+        Fundamento: {result.derecho_regulatorio}
+      </div>
+
       {/* Botones de Acción */}
       <div className="mt-auto flex flex-col gap-2 pt-4">
         <GoogleWalletButton 

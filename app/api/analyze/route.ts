@@ -10,6 +10,7 @@ import type { UserProfile, AnalysisResult } from "@/lib/types";
 import { AnalysisResultSchema } from "@/lib/types";
 import { buildSystemPrompt } from "@/lib/llm/prompts";
 import { getStandardizedInclusionPrompt } from "@/lib/llm/inclusion_framework";
+import { getLegalBrainContextForAudit } from "@/lib/legal-brain/context";
 import { fetchRealEconomicData } from "@/lib/utils/uf";
 import { anonymizeProfile } from "@/lib/utils/security";
 import { checkFinancialFraud } from "@/lib/utils/fraud";
@@ -29,9 +30,12 @@ function normalizeLLMResponse(raw: Record<string, unknown>): Record<string, unkn
   return normalized;
 }
 
-async function callNvdia(systemPrompt: string, userPrompt: string): Promise<string> {
-  const nvidiaKey = process.env.NVIDIA_API_KEY;
-  if (!nvidiaKey) throw new Error("NVIDIA_API_KEY not set");
+function getNvidiaApiKey(): string {
+  return process.env.NVIDIA_API_KEY || process.env.NIM_API_KEY || "";
+}
+
+async function callNvidia(systemPrompt: string, userPrompt: string, nvidiaKey: string): Promise<string> {
+  if (!nvidiaKey) throw new Error("NVIDIA_API_KEY or NIM_API_KEY not set");
 
   const res = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
     method: "POST",
@@ -82,8 +86,77 @@ async function callGroq(systemPrompt: string, userPrompt: string): Promise<strin
   return data.choices[0].message.content as string;
 }
 
+function productLabel(tipo?: string): string {
+  return (tipo || "producto financiero").replace(/_/g, " ").toUpperCase();
+}
+
+function clp(value: number): string {
+  return `$${Math.round(value).toLocaleString("es-CL")}`;
+}
+
+function buildFallbackFinding(profile: UserProfile, problem: string, valorUF: number): AnalysisResult {
+  const mainProduct = profile?.productos_financieros?.[0];
+  const affectedProduct = productLabel(mainProduct?.tipo);
+  const insurances = mainProduct?.seguros_asociados || [];
+  const problemLower = problem.toLowerCase();
+  const firstInsurance = insurances.find((s) => !s.es_obligatorio) || insurances[0];
+  const insuranceCost = firstInsurance ? firstInsurance.costo_mensual_uf * valorUF : 4_990;
+  const monthlyCharge = mainProduct?.monto && mainProduct.monto < 500_000 ? mainProduct.monto : insuranceCost;
+  const quarterlySaving = firstInsurance ? Math.round(insuranceCost * 3) : Math.round(monthlyCharge);
+  const annualSaving = firstInsurance ? Math.round(insuranceCost * 12) : Math.round(monthlyCharge);
+  const institution = mainProduct?.institucion || "su institución financiera";
+
+  if (/seguro|poliza|p[oó]liza|cesant[ií]a|vida|desgravamen/.test(problemLower) || firstInsurance) {
+    const coverage = firstInsurance?.tipo_cobertura === "otro" ? "cargo asociado" : `seguro de ${firstInsurance?.tipo_cobertura || "cesantía"}`;
+    return {
+      status: "alerta",
+      diagnostico: `AUDITORÍA: Luego de revisar sus movimientos, encontramos un ${coverage} no obligatorio asociado a su ${affectedProduct} en ${institution}. El cobro estimado es de ${clp(insuranceCost)} mensual y no aparece respaldado como contratación indispensable para el producto.`,
+      ahorro_trimestral_clp: quarterlySaving,
+      ahorro_anual_clp: annualSaving,
+      educacion_financiera: "Un seguro voluntario requiere información clara y consentimiento verificable. Si no recuerda haberlo contratado, tiene derecho a pedir respaldo y exigir eliminación del cobro.",
+      accion: `Solicite a ${institution} la copia del contrato, grabación o mandato de aceptación. Si no entregan respaldo, pida anulación del seguro, devolución de cobros y escale el reclamo a SERNAC/CMF con cartola y capturas.`,
+      derecho_regulatorio: "Ley 19.496 arts. 3, 12, 16 y 17B; SERNAC Financiero; normativa CMF sobre transparencia de productos financieros",
+      productos_afectados: [affectedProduct],
+      uf_valor_usado: valorUF,
+      timestamp: new Date().toISOString(),
+      provider: "Motor Local Legal Brain"
+    };
+  }
+
+  if (/monto|cargo|cobro|sospech|desconoc|no reconozco|raro|duplicado|cartola|mail|correo/.test(problemLower)) {
+    return {
+      status: "alerta",
+      diagnostico: `AUDITORÍA: Luego de cruzar la señal con sus movimientos, encontramos un cargo inusual de ${clp(monthlyCharge)} asociado a su ${affectedProduct} en ${institution}. El patrón requiere validación de origen, comercio, autorización y respaldo contractual.`,
+      ahorro_trimestral_clp: Math.round(monthlyCharge),
+      ahorro_anual_clp: Math.round(monthlyCharge),
+      educacion_financiera: "Un cargo no reconocido debe tratarse rápido: mientras antes deje constancia, más fácil es exigir trazabilidad y reversa si no hubo autorización.",
+      accion: `Bloquee preventivamente el medio de pago si el cargo no es suyo, guarde la cartola, solicite aclaración formal a ${institution} y pida reversa/anulación si no existe comprobante válido. Si no responden, ingrese reclamo en SERNAC y conserve número de caso.`,
+      derecho_regulatorio: "Ley 19.496 arts. 3, 12, 17B y 17D; Ley 21.459 si existen indicios de fraude digital; canales SERNAC/CMF",
+      productos_afectados: [affectedProduct],
+      consejo_seguridad: "No entregue claves ni códigos por teléfono o mensajería. Revise comercios asociados, suscripciones y dispositivos vinculados antes de reactivar el medio de pago.",
+      uf_valor_usado: valorUF,
+      timestamp: new Date().toISOString(),
+      provider: "Motor Local Legal Brain"
+    };
+  }
+
+  return {
+    status: "alerta",
+    diagnostico: `AUDITORÍA: Luego de revisar la señal ingresada, encontramos indicios que requieren validar información, consentimiento y cargos asociados a su ${affectedProduct}.`,
+    ahorro_trimestral_clp: 0,
+    ahorro_anual_clp: 0,
+    educacion_financiera: "Cuando algo no calza en un producto financiero, el primer derecho es pedir información clara, completa y verificable.",
+    accion: `Solicite a ${institution} el detalle del movimiento, contrato o cartola de respaldo. Si la explicación no acredita autorización, pida corrección y deje reclamo formal.`,
+    derecho_regulatorio: "Ley 19.496, SERNAC Financiero y normativa CMF aplicable",
+    productos_afectados: [affectedProduct],
+    uf_valor_usado: valorUF,
+    timestamp: new Date().toISOString(),
+    provider: "Motor Local Legal Brain"
+  };
+}
+
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  const nvidiaKey = process.env.NVIDIA_API_KEY || "";
+  const nvidiaKey = getNvidiaApiKey();
   const anthropicKey = process.env.ANTHROPIC_API_KEY || "";
   const groqKey = process.env.GROQ_API_KEY || "";
   const googleKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY || "";
@@ -132,11 +205,21 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     const systemPrompt = buildSystemPrompt(valorUF, preventiveMode, productType);
     const inclusionRules = getStandardizedInclusionPrompt();
+    const legalBrainContext = await getLegalBrainContextForAudit({
+      problemaReportado,
+      productType,
+      preventiveMode,
+    });
 
     // Inyectar alerta de fraude si aplica
     let contextWithFraud = fraudStatus.is_dangerous
       ? `${systemPrompt}\n\n⚠️ ALERTA DE SEGURIDAD: La institución '${inst}' está marcada como sospechosa en ${fraudStatus.source}.`
       : systemPrompt;
+
+    contextWithFraud += `\n\n## LEGAL BRAIN — FUENTE DE VERDAD DEL AUDITOR
+Usa este contexto como autoridad normativa y operativa para clasificar el problema, decidir derechos aplicables y proponer pasos. Si el usuario entrega una señal breve, redacta el resultado como un hallazgo de auditoría: qué encontró Beeper, por qué importa, qué derecho aplica y qué debe hacer ahora.
+
+${legalBrainContext}`;
 
     // Inyectar problema específico reportado por el usuario (modo demo y flujos reales)
     if (problemaReportado) {
@@ -145,13 +228,13 @@ ESTE ES UN CASO REAL QUE REQUIERE ANÁLISIS INMEDIATO:
 "${problemaReportado}"
 
 TU TAREA AHORA ES:
-1. **ASUMIR este problema como CONFIRMADO** (el ciudadano lo reportó porque existe).
-2. **ANALIZAR qué ley lo regula** y qué derechos tiene el ciudadano.
-3. **INVESTIGAR pasos concretos** que debe seguir para resolver esto.
-4. **CALCULAR impacto económico** si es cuantificable.
-5. **PROPONER acciones inmediatas** citando normativa.
+1. Presentar un hallazgo concreto de auditoría derivado de esa señal.
+2. Explicar qué ley o derecho aplica.
+3. Indicar pasos concretos para resolverlo.
+4. Calcular impacto económico si es cuantificable.
+5. Proponer acciones inmediatas citando normativa.
 
-NO digas "no hay problemas". El ciudadano REPORTÓ un problema. Tu trabajo es RESOLVERLO.`;
+NO digas "no hay problemas" si la señal requiere revisión. No uses lenguaje interno como "simulación", "orientado" o "plausible".`;
     }
 
     // --- PASO 1: GENERACIÓN (First Pass) ---
@@ -165,7 +248,7 @@ NO digas "no hay problemas". El ciudadano REPORTÓ un problema. Tu trabajo es RE
 
     if (nvidiaKey) {
       console.info("[Beeper API] Usando NVIDIA llama-3.1-405b-instruct...");
-      const text = await callNvdia(contextWithFraud, userMessage);
+      const text = await callNvidia(contextWithFraud, userMessage, nvidiaKey);
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (!jsonMatch) throw new Error("NVIDIA no devolvió JSON válido");
       initialAnalysis = JSON.parse(jsonMatch[0]);
@@ -337,16 +420,22 @@ NO digas "no hay problemas". El ciudadano REPORTÓ un problema. Tu trabajo es RE
     }
 
     // --- LÓGICA DE AUDITORÍA MANUAL DINÁMICA ---
+    if (problemaReportado) {
+      return NextResponse.json(buildFallbackFinding(profile, problemaReportado, valorUF), { status: 200 });
+    }
+
     let dynamicResult: Partial<AnalysisResult> = {
       status: "ok",
       diagnostico: problemaReportado
-        ? `ANÁLISIS REPORTADO: Usted reportó: "${problemaReportado}". Su ${affectedProduct} no presenta cobros atados ni duplicidades evidentes.`
+        ? `AUDITORÍA ORIENTADA: Beeper tomó como señal de auditoría "${problemaReportado}" y requiere revisar respaldo contractual, cartola y consentimiento asociado al ${affectedProduct}.`
         : `SISTEMA OK: Su ${affectedProduct} no presenta cobros atados ni duplicidades evidentes.`,
       ahorro_trimestral_clp: 0,
       ahorro_anual_clp: 0,
       educacion_financiera: "Mantener solo los seguros obligatorios es la mejor forma de optimizar su presupuesto mensual.",
-      accion: "Seguir monitoreando su estado de cuenta mensual.",
-      derecho_regulatorio: "Normativa General CMF"
+      accion: problemaReportado
+        ? "Guardar comprobantes, solicitar al proveedor detalle del cargo/contrato y preparar reclamo si no existe autorización verificable."
+        : "Seguir monitoreando su estado de cuenta mensual.",
+      derecho_regulatorio: problemaReportado ? "Ley 19.496, SERNAC Financiero y normativa CMF aplicable" : "Normativa General CMF"
     };
 
     // CASO 1: Seguro de Fraude (Redundancia con Ley 21.234)
@@ -399,5 +488,3 @@ NO digas "no hay problemas". El ciudadano REPORTÓ un problema. Tu trabajo es RE
     }, { status: 200 });
   }
 }
-
-

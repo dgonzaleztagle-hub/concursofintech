@@ -200,6 +200,89 @@ function buildBaseProfile(userProfile: BeeperUserProfile | null): UserProfile {
   };
 }
 
+function buildAuditProfileFromProblem(userProfile: BeeperUserProfile | null, problemInput: string): UserProfile {
+  const baseProfile = buildBaseProfile(userProfile);
+  const problem = problemInput.toLowerCase();
+  const isInsurance = /seguro|poliza|p[oó]liza|cesant[ií]a|vida|desgravamen/.test(problem);
+  const isMortgage = /hipotec|dividendo|vivienda/.test(problem);
+  const isStatement = /cartola|mail|correo|estado de cuenta|comprobante/.test(problem);
+  const isSuspiciousCharge = /monto|cargo|cobro|sospech|desconoc|no reconozco|raro|duplicado/.test(problem);
+  const isFraud = /fraude|estafa|phishing|hack|clonad|robo/.test(problem);
+
+  if (isMortgage) {
+    return {
+      ...baseProfile,
+      fuente_datos: "manual",
+      productos_financieros: [{
+        id_producto: "AUDIT-HIPOTECARIO-001",
+        tipo: "credito_hipotecario",
+        institucion: "Banco Santander",
+        monto: 92_000_000,
+        tasa_anual: 4.8,
+        plazo_meses: 240,
+        seguros_asociados: [
+          {
+            id_seguro: "SEG-DESGRAVAMEN-OBLIGATORIO",
+            tipo_cobertura: "desgravamen",
+            es_obligatorio: true,
+            costo_mensual_uf: 0.22,
+            institucion_aseguradora: "Seguros Santander",
+          },
+          {
+            id_seguro: "SEG-VIDA-ADICIONAL",
+            tipo_cobertura: "vida",
+            es_obligatorio: false,
+            costo_mensual_uf: 0.35,
+            institucion_aseguradora: "Seguros Santander",
+          },
+        ],
+      }],
+    };
+  }
+
+  if (isInsurance) {
+    return {
+      ...baseProfile,
+      fuente_datos: "manual",
+      productos_financieros: [{
+        id_producto: "AUDIT-TC-SEGURO-001",
+        tipo: "tarjeta_credito",
+        institucion: "Banco BCI",
+        monto: 1_200_000,
+        seguros_asociados: [{
+          id_seguro: isFraud ? "SEG-FRAUDE-NO-RECONOCIDO" : "SEG-CESANTIA-NO-RECONOCIDO",
+          tipo_cobertura: isFraud ? "fraude" : "cesantia",
+          es_obligatorio: false,
+          costo_mensual_uf: 0.18,
+          institucion_aseguradora: "Cardif Chile",
+        }],
+      }],
+    };
+  }
+
+  if (isStatement || isSuspiciousCharge || isFraud) {
+    return {
+      ...baseProfile,
+      fuente_datos: "manual",
+      productos_financieros: [{
+        id_producto: "AUDIT-TC-CARGO-001",
+        tipo: "tarjeta_credito",
+        institucion: "Banco Estado",
+        monto: 89_990,
+        seguros_asociados: [{
+          id_seguro: isFraud ? "SEG-FRAUDE-WALLET" : "SEG-CARGO-SOSPECHOSO",
+          tipo_cobertura: isFraud ? "fraude" : "otro",
+          es_obligatorio: false,
+          costo_mensual_uf: 0.12,
+          institucion_aseguradora: "Proveedor asociado",
+        }],
+      }],
+    };
+  }
+
+  return baseProfile;
+}
+
 export function useBeeperAudit() {
   const [state, setState] = useState<AppState>("idle");
   const [result, setResult] = useState<AnalysisResult | null>(null);
@@ -235,14 +318,6 @@ export function useBeeperAudit() {
       setState("result");
     }
   }, []);
-
-  // Simulación de Wallet
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (state === "idle") setShowWalletAlert(true);
-    }, 10000);
-    return () => clearTimeout(timer);
-  }, [state]);
 
   const handleRutChange = (value: string) => {
     const formatted = formatRut(value);
@@ -302,10 +377,13 @@ export function useBeeperAudit() {
   }, [manualProduct, manualInsurance]);
 
   const handleDemoConfirm = useCallback(async () => {
-    const profile = buildBaseProfile(userProfile);
+    const problem = customProblem.trim();
+    const profile = buildAuditProfileFromProblem(userProfile, problem);
 
     setState("scanning");
     setErrorMsg("");
+    setShowWalletAlert(false);
+    const walletTimer = window.setTimeout(() => setShowWalletAlert(true), 700);
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
@@ -317,12 +395,14 @@ export function useBeeperAudit() {
         signal: controller.signal,
         body: JSON.stringify({
           ...profile,
-          problemaReportado: customProblem.trim(),
+          problemaReportado: problem,
           demoMode: true,
         }),
       });
 
       clearTimeout(timeoutId);
+      clearTimeout(walletTimer);
+      setShowWalletAlert(false);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -335,6 +415,8 @@ export function useBeeperAudit() {
       setState("result");
     } catch (err) {
       clearTimeout(timeoutId);
+      clearTimeout(walletTimer);
+      setShowWalletAlert(false);
       const isNetworkError = err instanceof TypeError || (err instanceof Error && err.name === "AbortError");
       if (isNetworkError) {
         runLocalMock();
