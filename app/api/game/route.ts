@@ -1,22 +1,22 @@
 import { NextResponse } from "next/server";
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
-const NIM_API_KEY = process.env.NIM_API_KEY;
+const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY || process.env.NIM_API_KEY;
 
 const PROVIDERS = [
+  {
+    name: "nim",
+    url: "https://integrate.api.nvidia.com/v1/chat/completions",
+    key: () => NVIDIA_API_KEY,
+    model: "mistralai/mistral-nemotron",
+    supportsJsonMode: false,
+  },
   {
     name: "groq",
     url: "https://api.groq.com/openai/v1/chat/completions",
     key: () => GROQ_API_KEY,
     model: "llama-3.3-70b-versatile",
     supportsJsonMode: true,
-  },
-  {
-    name: "nim",
-    url: "https://integrate.api.nvidia.com/v1/chat/completions",
-    key: () => NIM_API_KEY,
-    model: "mistralai/mistral-nemotron",
-    supportsJsonMode: false,
   },
 ];
 
@@ -298,15 +298,113 @@ ${alertas.length > 0 ? "   IMPORTANTE: refleja la crisis en el siguiente escenar
 Responde como JSON puro válido. Sin markdown.`;
 }
 
+function buildLocalGameMaster(input: GameRequest) {
+  const edad = input.edad || 13;
+  const saldo = input.saldoActual ?? (edad <= 12 ? 50000 : 100000);
+  const deudas = input.deudasActuales ?? 0;
+  const familia = input.relacionesFamilia ?? 75;
+  const amigos = input.relacionesAmigos ?? 70;
+
+  if (input.fase === "init") {
+    const initialSaldo = edad <= 12 ? 50000 : 120000;
+    return {
+      message: `Es viernes por la tarde y acabas de recibir $${initialSaldo.toLocaleString("es-CL")}. En el chat del curso todos hablan de juntarse en el mall, pero en la casa también quedó pendiente comprar algo que necesitas para la semana.\n\nTienes la plata en la mano y una decisión simple que no se siente tan simple: usarla para pasarlo bien ahora o guardarte margen para no quedar justo después.`,
+      conceptoEnsenado: "dinero",
+      puntos: 0,
+      escenario: {
+        narracion: `Es viernes por la tarde y acabas de recibir $${initialSaldo.toLocaleString("es-CL")}. En el chat del curso todos hablan de juntarse en el mall, pero en la casa también quedó pendiente comprar algo que necesitas para la semana.\n\nTienes la plata en la mano y una decisión simple que no se siente tan simple: usarla para pasarlo bien ahora o guardarte margen para no quedar justo después.`,
+        opciones: [
+          { id: "opcion_a", texto: "Ir al mall, pero poner un límite de gasto antes de salir.", consecuenciaHint: "Controlas el impulso sin aislarte." },
+          { id: "opcion_b", texto: "Comprar primero lo necesario y ver cuánto queda para juntarte.", consecuenciaHint: "Priorizas estabilidad, pero puede costar socialmente." }
+        ],
+        concepto: "dinero",
+        ubicacion: "casa",
+        turno: 1,
+        personajes: [
+          { nombre: "Mamá", rol: "familia", estadoEmocional: "atenta" },
+          { nombre: "Tomás", rol: "amigo", estadoEmocional: "entusiasmado" }
+        ],
+      },
+      saludFinanciera: {
+        valor: 70,
+        saldo: initialSaldo,
+        deudas: 0,
+        relacionesFamilia: 75,
+        relacionesAmigos: 70,
+        alerta: null
+      },
+      objetivoActual: {
+        descripcion: "Termina el próximo turno con al menos la mitad de tu dinero disponible.",
+        recompensa: "Ganas confianza para decidir sin presión.",
+        consecuenciaSiFalla: "Quedas con menos margen para imprevistos."
+      }
+    };
+  }
+
+  const decision = input.respuestaJugador || "tomar una decisión";
+  const lower = decision.toLowerCase();
+  const responsible = /l[ií]mite|necesario|guardar|ahorrar|comparar|presupuesto|primero/.test(lower);
+  const spend = /mall|comprar|salir|gastar|invitar|pedir/.test(lower);
+  const deltaSaldo = responsible ? -12000 : spend ? -32000 : -18000;
+  const saldoNuevo = Math.max(0, saldo + deltaSaldo);
+  const deudasNuevas = deudas + (responsible ? 0 : saldoNuevo < 20000 ? 15000 : 0);
+  const relacionesFamiliaNueva = Math.max(0, Math.min(100, familia + (responsible ? 4 : -4)));
+  const relacionesAmigosNueva = Math.max(0, Math.min(100, amigos + (spend ? 4 : -1)));
+  const saludValor = Math.max(0, Math.min(100, Math.round(70 + saldoNuevo / 5000 - deudasNuevas / 6000 + (relacionesFamiliaNueva - 75) / 3)));
+  const puntos = responsible ? 75 : 40;
+  const concepto = input.conceptoActual || "presupuesto";
+  const nextTurn = (input.turno || 1) + 1;
+
+  return {
+    message: `Elegiste ${decision}. La decisión se nota al tiro: te queda $${saldoNuevo.toLocaleString("es-CL")} y empiezas a mirar el resto de la semana con otros ojos.\n\nNo fue solo mover plata; fue decidir cuánto control querías conservar para lo que viene. La gente alrededor reacciona distinto, pero ahora tienes más claro que cada peso usado deja menos espacio para otra cosa.`,
+    conceptoEnsenado: concepto,
+    puntos,
+    escenario: {
+      narracion: `Al día siguiente aparece una nueva presión: hay una actividad con amigos, pero también un gasto chico que no habías considerado. Parece menor, hasta que miras tu saldo.\n\nLa pregunta ya no es si puedes gastar, sino si ese gasto calza con el objetivo que te pusiste.`,
+      opciones: [
+        { id: "opcion_a", texto: "Comparar precios y elegir la opción más barata.", consecuenciaHint: "Cuidas saldo sin cancelar todo." },
+        { id: "opcion_b", texto: "Pagar rápido para no quedar mal con el grupo.", consecuenciaHint: "Mantienes el ritmo social, pero pierdes margen." }
+      ],
+      concepto: "presupuesto",
+      ubicacion: "colegio",
+      turno: nextTurn,
+      personajes: [
+        { nombre: "Tomás", rol: "amigo", estadoEmocional: "apurado" },
+        { nombre: "Mamá", rol: "familia", estadoEmocional: "observadora" }
+      ],
+    },
+    saldoNuevo,
+    deudasNuevas,
+    relacionesFamiliaNueva,
+    relacionesAmigosNueva,
+    saludFinanciera: {
+      valor: saludValor,
+      alerta: saldoNuevo < 20000 ? "Saldo bajo: conviene cuidar cada gasto." : null
+    },
+    pausaEducativa: {
+      concepto: "presupuesto",
+      quienExplica: "Mamá",
+      explicacion: "Presupuesto no es dejar de vivir, es decidir antes para que la plata no decida por ti después. Hoy viste que gastar sin mirar el resto de la semana te deja con menos libertad.",
+      preguntaReflexiva: "¿Qué gasto chico te ha dejado apretado alguna vez?"
+    },
+    objetivoActual: {
+      descripcion: `Llega al turno ${nextTurn} sin crear nueva deuda y con al menos $${Math.max(10000, Math.round(saldoNuevo * 0.6)).toLocaleString("es-CL")}.`,
+      recompensa: "Puedes resolver el siguiente problema sin pedir ayuda.",
+      consecuenciaSiFalla: "Tendrás que elegir entre deuda o cancelar algo importante."
+    },
+    objetivoLogrado: responsible,
+    transicion: "La semana sigue y la presión cambia de forma.",
+    proximoConcepto: "presupuesto",
+    consecuencias: "La decisión impactó tu saldo y tu margen para el siguiente turno."
+  };
+}
+
 export async function POST(req: Request) {
   const input: GameRequest = await req.json();
 
   const availableProviders = PROVIDERS.filter(p => p.key());
   if (availableProviders.length === 0) {
-    return NextResponse.json(
-      { message: "No AI provider configured. Set GROQ_API_KEY or NIM_API_KEY." },
-      { status: 500 }
-    );
+    return NextResponse.json(buildLocalGameMaster(input), { status: 200 });
   }
 
   const userPrompt = buildPrompt(input);
@@ -339,11 +437,7 @@ export async function POST(req: Request) {
       if (!response.ok) {
         const errText = await response.text();
         console.warn(`[${provider.name}] ${response.status}: ${errText}`);
-        if (response.status === 429 || response.status === 503) continue;
-        return NextResponse.json(
-          { message: `AI error (${provider.name}): ${errText}` },
-          { status: response.status }
-        );
+        continue;
       }
 
       const data = await response.json();
@@ -357,10 +451,7 @@ export async function POST(req: Request) {
   }
 
   if (!content) {
-    return NextResponse.json(
-      { message: "Todos los proveedores de IA están ocupados. Intenta en un momento." },
-      { status: 503 }
-    );
+    return NextResponse.json(buildLocalGameMaster(input), { status: 200 });
   }
 
   let gm: Record<string, unknown>;
@@ -369,10 +460,7 @@ export async function POST(req: Request) {
     gm = JSON.parse(jsonStr);
   } catch {
     console.error("JSON parse failed:", content.slice(0, 200));
-    return NextResponse.json(
-      { message: "Error interpretando la respuesta del Game Master. Intenta de nuevo." },
-      { status: 500 }
-    );
+    return NextResponse.json(buildLocalGameMaster(input), { status: 200 });
   }
 
   const narracion = (gm.narracion as string) || (gm.narración as string) || "";

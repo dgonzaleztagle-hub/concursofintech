@@ -69,6 +69,13 @@ function getOpciones(e?: Escenario | null): string[] {
   return e.opciones.map(o => (typeof o === "string" ? o : o.texto));
 }
 
+function assertGameResponse(res: Response, data: { message?: string }) {
+  if (!res.ok) throw new Error(data.message || "Game Master no disponible");
+  if (typeof data.message === "string" && /unauthorized|authentication|api error|status.*401/i.test(data.message)) {
+    throw new Error("Game Master no disponible");
+  }
+}
+
 function saludColor(v: number) {
   if (v >= 60) return "#1a2f1a";
   if (v >= 35) return "#7a5c00";
@@ -255,6 +262,7 @@ export default function AprendePage() {
         body: JSON.stringify({ fase: "init", edad }),
       });
       const data = await res.json();
+      assertGameResponse(res, data);
 
       const primerEscenario: Escenario = data.escenario || {
         narracion: data.message,
@@ -310,6 +318,7 @@ export default function AprendePage() {
         }),
       });
       const data = await res.json();
+      assertGameResponse(res, data);
 
       const puntos = data.puntos ?? 40;
       const saldoNuevo = data.saldoNuevo ?? gameState.saldo;
